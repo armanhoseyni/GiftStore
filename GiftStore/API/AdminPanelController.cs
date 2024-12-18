@@ -1,8 +1,10 @@
-﻿using API_M.Models;
+﻿using GiftStore.Data;
 using GiftStore.Models;
-using Microsoft.AspNetCore.Http;
+using GiftStore.ViewModels;
 using Microsoft.AspNetCore.Mvc;
-
+using ClosedXML.Excel;
+using DocumentFormat.OpenXml.Office2010.Excel;
+using GiftStore.Services;
 namespace GiftStore.API
 {
     [Route("api/[controller]")]
@@ -19,66 +21,120 @@ namespace GiftStore.API
         {
 
 
-            List<Users> products = db.users.ToList();
-            return Ok(products);
+            List<Users> allusers = db.users.ToList();
+            if (allusers.Count <= 0)
+            {
+                return NotFound(new { message = "No user found ", StatusCode = 404 });
+            }
+            else
+            {
+
+
+                return Ok(allusers);
+
+            }
+
+        }
+        [HttpGet("/GetAllUsersCounts")]
+        public IActionResult GetAllUsersCounts()
+        {
+
+
+            List<Users> allusers = db.users.ToList();
+            if (allusers.Count <= 0)
+            {
+                return NotFound(new { message = "No user found ", StatusCode = 404 });
+            }
+            else
+            {
+
+
+                return Ok(allusers.Count);
+
+            }
 
         }
         [HttpPost("/AddUser")]
-        public IActionResult AddUser(string firstName, string lastName, string phoneNumber, string? password, string? rePassword)
+        public IActionResult AddUser([FromBody] UsersViewModel model)
         {
-            // Input validation
-            if (string.IsNullOrWhiteSpace(phoneNumber))
+            if (string.IsNullOrWhiteSpace(model.Phone))
                 return BadRequest("Phone number is required.");
 
-            if (password != rePassword)
+            if (model.Password != model.RePassword)
                 return BadRequest("Passwords do not match.");
 
-            // Create a new user object
-            var user = new Users
+            var user = new Users();
+            if (db.users.Any(u => u.Phone == model.Phone))
             {
-                FirstName = firstName,
-                LastName = lastName,
-                Phone = phoneNumber,
-                Password = password,
-                RePassword = rePassword
-            };
+                return BadRequest("A user with this phone number exist");
 
-            // Add the user to the database
-            db.users.Add(user);
-            db.SaveChanges();
+            }
+            else
+            {/////
+                ////hash passwords
 
-            return Ok(new { Message = "User added successfully.", User = user });
+                user.FirstName = model.FirstName;
+                user.LastName = model.LastName;
+                user.Phone = model.Phone;
+                user.Password = model.Password;
+                user.RePassword = model.RePassword;
+                user.Email = model.Email;
+                user.RegisterDate = DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss");
+                user.Active = true;
+                user.Stars = 0;
+                user.wallet = 0;
+
+
+                db.users.Add(user);
+                db.SaveChanges();
+
+                return Ok(new { Message = "User added successfully.", User = user });
+            }
+
         }
 
         [HttpPut("/UpdateUser")]
-        public IActionResult UpdateUser(int id, string? firstName, string? lastName, string? phone, string? password, string? rePassword)
+        public IActionResult UpdateUser([FromBody] UsersViewModel model)
         {
-            var user = db.users.FirstOrDefault(u => u.Id == id);
-            if (user == null)
-                return NotFound("User not found.");
+            var user = db.users.FirstOrDefault(u => u.Phone == model.Phone);
 
-            if (!string.IsNullOrWhiteSpace(firstName))
-                user.FirstName = firstName;
+            if (!CheckUserExists1(model.Phone))
+            {
 
-            if (!string.IsNullOrWhiteSpace(lastName))
-                user.LastName = lastName;
 
-            if (!string.IsNullOrWhiteSpace(phone))
-                user.Phone = phone;
+                if (user == null)
+                    return NotFound(new { message = "User not  found ", StatusCode = 404 });
 
-            if (!string.IsNullOrWhiteSpace(password) && password == rePassword)
-                user.Password = password;
+                if (!string.IsNullOrWhiteSpace(model.FirstName))
+                    user.FirstName = model.FirstName;
 
-            db.SaveChanges();
+                if (!string.IsNullOrWhiteSpace(model.LastName))
+                    user.LastName = model.LastName;
 
-            return Ok(new { Message = "User updated successfully.", User = user });
+                if (!string.IsNullOrWhiteSpace(model.Phone))
+
+                    user.Phone = model.Phone;
+
+                if (!string.IsNullOrWhiteSpace(model.Password) && model.Password == model.RePassword)
+                    user.Password = model.Password;
+
+                db.SaveChanges();
+
+                return Ok(new { Message = "User updated successfully.", User = user });
+            }
+            else
+            {
+                return BadRequest("A user with this phone number exist");
+
+            }
+
         }
         [HttpDelete("/DeleteUser")]
         public IActionResult DeleteUser(int id)
         {
             var user = db.users.FirstOrDefault(u => u.Id == id);
             if (user == null)
-                return NotFound("User not found.");
+                return NotFound(new { message = "User not  found ", StatusCode = 404 });
 
             db.users.Remove(user);
             db.SaveChanges();
@@ -90,7 +146,7 @@ namespace GiftStore.API
         {
             var user = db.users.FirstOrDefault(u => u.Id == id);
             if (user == null)
-                return NotFound("User not found.");
+                return NotFound(new { message = "User not  found ", StatusCode = 404 });
 
             return Ok(user);
         }
@@ -100,7 +156,7 @@ namespace GiftStore.API
         {
             var users = db.users.Where(u => u.Phone.Contains(phone)).ToList();
             if (!users.Any())
-                return NotFound("No users found with the given phone number.");
+                return NotFound(new { message = "No users found with the given phone number.", StatusCode = 404 });
 
             return Ok(users);
         }
@@ -108,9 +164,285 @@ namespace GiftStore.API
         public IActionResult CheckUserExists(string phone)
         {
             var exists = db.users.Any(u => u.Phone == phone);
-            return Ok(new { Exists = exists });
+            if (!exists)
+            {
+                return NotFound(new { message = "No user exist with this phone nubmer", StatusCode = 404 });
+
+
+            }
+            return Ok(new { Exists = exists, StatusCode = 200 });
+        }
+        [HttpGet("/CheckUserExists1")]
+        public bool CheckUserExists1(string phone)
+        {
+            var exists = db.users.Any(u => u.Phone == phone);
+            if (!exists)
+            {
+                return false;
+
+            }
+            return true;
         }
 
 
+
+        [HttpGet("/GenerateKey")]
+        public IActionResult GenerateKey()
+        {
+            Services.InfoSec en = new Services.InfoSec();
+            string Key = en.GenerateKey();
+
+            return Ok(Key);
+
+
+        }
+
+        [HttpGet("/CheckEncryption")]
+        public IActionResult CheckEncryption(string text, string key)
+        {
+            Services.InfoSec en = new Services.InfoSec();
+            string IVKey = "";
+            var result = en.Encrypt(text, key, out IVKey);
+            var IVKey1 = IVKey;
+            return Ok(result + "/" + IVKey1);
+
+
+        }
+
+        [HttpGet("/Decryption")]
+
+        public IActionResult Decryption(string ciper, string key, string IVKey)
+        {
+            Services.InfoSec en = new Services.InfoSec();
+
+            var result = en.Decrypt(ciper, key, IVKey);
+
+            return Ok(result);
+
+
+        }
+
+        [HttpPost("/AddGiftCart")]
+        public IActionResult AddGiftCart(string code, string country, string label, string type, double price, DateTime expdate, string status, string directory)
+        {
+            Services.InfoSec en = new Services.InfoSec();
+            string Key = en.GenerateKey();
+            string IVKey = "";
+            var result = en.Encrypt(code, Key, out IVKey);
+
+            GiftCards newCard = new GiftCards
+            {
+                Code = result,
+                Country = country,
+                label = en.GenerateRandom10DigitNumber(),
+                type = type,
+                Price = price,
+                ExpDate = expdate,
+                Status = status
+            };
+
+            db.giftCards.Add(newCard);
+
+            db.SaveChanges();
+            // Save to Excel
+            SaveToExcel(newCard.Id, code, result, Key, IVKey, directory);
+
+            // Prepare the file for download
+            string filePath = @"D:\c# codes\api5\GiftStore\GiftCards\GiftCards.xlsx";
+            if (System.IO.File.Exists(filePath))
+            {
+                byte[] fileBytes = System.IO.File.ReadAllBytes(filePath);
+                return File(fileBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "GiftCards.xlsx");
+            }
+
+            return Ok(new { message = "کارت با موفقیت ثبت شد ", StatusCode = 200 });
+
+        }
+
+        private void SaveToExcel(int id, string code, string result, string key, string ivKey, string directory)
+        {
+            string directoryPath = directory;
+            string fileName = "GiftCards.xlsx";
+            string filePath = Path.Combine(directoryPath, fileName);
+
+            // Ensure the directory exists
+            if (!Directory.Exists(directoryPath))
+            {
+                Directory.CreateDirectory(directoryPath);
+            }
+
+            // Initialize the workbook and worksheet
+            IXLWorkbook workbook;
+            IXLWorksheet worksheet;
+
+            if (System.IO.File.Exists(filePath))
+            {
+                // Load the existing file
+                workbook = new ClosedXML.Excel.XLWorkbook(filePath);
+                worksheet = workbook.Worksheets.First();
+            }
+            else
+            {
+                // Create a new workbook and worksheet
+                workbook = new ClosedXML.Excel.XLWorkbook();
+                worksheet = workbook.Worksheets.Add("GiftCards");
+                worksheet.Cell(1, 1).Value = "ID";
+                worksheet.Cell(1, 2).Value = "Code";
+                worksheet.Cell(1, 3).Value = "Result";
+                worksheet.Cell(1, 4).Value = "Key";
+                worksheet.Cell(1, 5).Value = "IVKey";
+            }
+
+            // Find the next empty row
+            int lastRow = worksheet.LastRowUsed()?.RowNumber() ?? 1;
+            int newRow = lastRow + 1;
+
+            // Add the data
+            worksheet.Cell(newRow, 1).Value = id;
+            worksheet.Cell(newRow, 2).Value = code;
+            worksheet.Cell(newRow, 3).Value = result;
+            worksheet.Cell(newRow, 4).Value = key;
+            worksheet.Cell(newRow, 5).Value = ivKey;
+
+            // Save the workbook
+            workbook.SaveAs(filePath);
+        }
+
+
+
+
+        [HttpGet("/SearchGiftCardByStatus")]
+
+        public IActionResult SearchGiftCardByStatus(string status)
+        {
+            var giftcards = db.giftCards.Where(u => u.Status == (status)).ToList();
+            if (!giftcards.Any())
+                return NotFound(new { message = "گیفت کارتی با چنین وضعیتی وجود ندارد", StatusCode = 404 });
+
+            return Ok(giftcards);
+
+        }
+
+
+        [HttpGet("/SearchGiftCardByCountry")]
+
+        public IActionResult SearchGiftCardByCountry(string country)
+        {
+            var giftcards = db.giftCards.Where(u => u.Country == (country)).ToList();
+            if (!giftcards.Any())
+                return NotFound(new { message = "گیفت کارتی با چنین کشوری وجود ندارد", StatusCode = 404 });
+
+            return Ok(giftcards);
+
+        }
+
+        [HttpGet("/SearchGiftCardByType")]
+
+        public IActionResult SearchGiftCardByType(string type)
+        {
+            var giftcards = db.giftCards.Where(u => u.type == (type)).ToList();
+            if (!giftcards.Any())
+                return NotFound(new { message = "گیفت کارتی با چنین نوعی وجود ندارد", StatusCode = 404 });
+
+            return Ok(giftcards);
+
+        }
+
+        [HttpDelete("/DeleteGiftCard")]
+
+        public IActionResult DeleteGiftCard(string label)
+        {
+            var Gc = db.giftCards.FirstOrDefault(u => u.Code == label);
+            if (Gc == null)
+                return NotFound(new { message = " گیفت کارت پیدا نشد ", StatusCode = 404 });
+
+            db.giftCards.Remove(Gc);
+            db.SaveChanges();
+
+            return Ok(new { Message = "گیفت کارت با موفقیت حذف شد" });
+
+        }
+
+        [HttpPut("/UpdategiftCard")]
+        public IActionResult UpdategiftCard(string code, string country, string label, string type, double price, DateTime expdate, string status)
+        {
+            var giftcard = db.giftCards.FirstOrDefault(u => u.label == label);
+
+            if (giftcard == null)
+            {
+                return NotFound(new { mesasge = "گیفت کارتی با این لیبل یافت نشد", StatusCode = 404 });
+
+            }
+            //// save ivkey and key and ciper anywhere
+            else
+            {
+                InfoSec en = new InfoSec();
+                string IVkey = "";
+                giftcard.Code = en.Encrypt(code,en.GenerateKey(),out IVkey);
+                giftcard.Country = country;
+                giftcard.type = type;
+                giftcard.Price = price;
+                giftcard.ExpDate = expdate;
+                giftcard.Status = status;
+                db.SaveChanges();
+                return Ok(new {meessage="اطلاعات با موفقیت بروزرسانی شد ", StatusCode=200});
+
+
+            }
+        }
+
+        [HttpGet("/SoldGiftsCount")]
+        public IActionResult SoldGiftsCount()
+        {
+            var soldgiftcards = db.giftCards.Where(u => u.Status == ("فروخته شده")).ToList();
+            if (soldgiftcards.Count <= 0)
+            {
+                return NotFound(new { message = "گیفت کارتی پیدا نشد ", StatusCode = 404 });
+            }
+            else
+            {
+
+
+                return Ok(soldgiftcards);
+
+            }
+        }
+        [HttpPut("/ActiveUser")]
+        public IActionResult ActiveUser(string phone)
+        {
+            var user = db.users.FirstOrDefault(u => u.Phone == phone);
+            if (user==null)
+            {
+                return NotFound(new { message = "کاربری با این شماره تلفن یافت نشد ", StatusCode = 404 });
+            }
+            else
+            {
+
+
+               user.Active = true;
+                db.SaveChanges();
+                return Ok(new {user,message="کاربر فعال شد",StatusCode=200});
+
+            }
+        }
+
+        [HttpPut("/DactiveUser")]
+        public IActionResult DactiveUser(string phone)
+        {
+            var user = db.users.FirstOrDefault(u => u.Phone == phone);
+            if (user == null)
+            {
+                return NotFound(new { message = "کاربری با این شماره تلفن یافت نشد ", StatusCode = 404 });
+            }
+            else
+            {
+
+
+                user.Active = false;
+                db.SaveChanges();
+                return Ok(new { user, message = "کاربر غیر فعال شد", StatusCode = 200 });
+
+            }
+        }
     }
 }

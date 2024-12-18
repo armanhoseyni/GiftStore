@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GiftStore.Migrations
 {
     [DbContext(typeof(Db_API))]
-    [Migration("20241206140128_addingUsersTable")]
-    partial class addingUsersTable
+    [Migration("20241214220400_addGiftCardTableANDViewModels")]
+    partial class addGiftCardTableANDViewModels
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -32,6 +32,13 @@ namespace GiftStore.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<bool>("Active")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("FirstName")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -49,6 +56,16 @@ namespace GiftStore.Migrations
 
                     b.Property<string>("RePassword")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RegisterDate")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Stars")
+                        .HasColumnType("int");
+
+                    b.Property<double?>("wallet")
+                        .HasColumnType("float");
 
                     b.HasKey("Id");
 

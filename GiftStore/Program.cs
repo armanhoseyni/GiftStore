@@ -1,4 +1,4 @@
-using API_M.Models;
+using GiftStore.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
@@ -11,7 +11,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddDbContext<Db_API>();
-builder.Services.AddAuthentication(x=>
+/*builder.Services.AddAuthentication(x=>
     {
         x.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
         x.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -35,7 +35,7 @@ builder.Services.AddAuthentication(x=>
 
 
 
-    });
+    });*/
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -47,8 +47,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.UseAuthorization();
-app.UseAuthentication();
+//app.UseAuthorization();
+//app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
