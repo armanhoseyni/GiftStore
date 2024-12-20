@@ -16,6 +16,8 @@ namespace GiftStore.API
         {
             db = db_;
         }
+
+        //users
         [HttpGet("/GetAllUsers")]
         public IActionResult GetAllUsers()
         {
@@ -40,7 +42,7 @@ namespace GiftStore.API
         {
 
 
-            List<Users> allusers = db.users.ToList();
+            List<Users> allusers = db.users.Where(x=>x.Role=="User").ToList();
             if (allusers.Count <= 0)
             {
                 return NotFound(new { message = "No user found ", StatusCode = 404 });
@@ -83,7 +85,7 @@ namespace GiftStore.API
                 user.Active = true;
                 user.Stars = 0;
                 user.wallet = 0;
-
+                model.Role = "User";
 
                 db.users.Add(user);
                 db.SaveChanges();
@@ -92,7 +94,12 @@ namespace GiftStore.API
             }
 
         }
-
+ 
+        
+        
+        /// <summary>
+        /// hash password
+       
         [HttpPut("/UpdateUser")]
         public IActionResult UpdateUser([FromBody] UsersViewModel model)
         {
@@ -114,6 +121,10 @@ namespace GiftStore.API
                 if (!string.IsNullOrWhiteSpace(model.Phone))
 
                     user.Phone = model.Phone;
+
+                if (!string.IsNullOrWhiteSpace(model.Role))
+
+                    user.Role = model.Role;
 
                 if (!string.IsNullOrWhiteSpace(model.Password) && model.Password == model.RePassword)
                     user.Password = model.Password;
@@ -186,6 +197,89 @@ namespace GiftStore.API
 
 
 
+        [HttpPut("/ActiveUser")]
+        public IActionResult ActiveUser(string phone)
+        {
+            var user = db.users.FirstOrDefault(u => u.Phone == phone);
+            if (user == null)
+            {
+                return NotFound(new { message = "کاربری با این شماره تلفن یافت نشد ", StatusCode = 404 });
+            }
+            else
+            {
+
+
+                user.Active = true;
+                db.SaveChanges();
+                return Ok(new { user, message = "کاربر فعال شد", StatusCode = 200 });
+
+            }
+        }
+
+        [HttpPut("/DactiveUser")]
+        public IActionResult DactiveUser(string phone)
+        {
+            var user = db.users.FirstOrDefault(u => u.Phone == phone);
+            if (user == null)
+            {
+                return NotFound(new { message = "کاربری با این شماره تلفن یافت نشد ", StatusCode = 404 });
+            }
+            else
+            {
+
+
+                user.Active = false;
+                db.SaveChanges();
+                return Ok(new { user, message = "کاربر غیر فعال شد", StatusCode = 200 });
+
+            }
+        }
+
+        [HttpGet("/ShowRespons")]
+        public IActionResult ShowRespons(int id) 
+        {
+        var ResponsesTickets=db.tickets.Where(x=>x.UserId== id && x.Status=="پاسخ داده شده").ToList();
+            if(ResponsesTickets.Count>0) { return Ok(ResponsesTickets); }
+            else { return BadRequest(new { message="تیکتی پاسخ داده نشده" ,StatusCode=400}); }
+      
+        }
+        [HttpGet("/ShowAllUsersTickets")]
+        public IActionResult ShowAllUsersTickets(int id)
+        {
+            var ResponsesTickets = db.tickets.Where(x => x.UserId == id).ToList();
+            if (ResponsesTickets.Count > 0) { return Ok(ResponsesTickets); }
+            else { return BadRequest(new { message = "تیکتی موجود نمیباشد نشده", StatusCode = 400 }); }
+
+        }
+
+
+        [HttpPost("/CreateTicket")]
+        public IActionResult CreateTicket([FromBody] AddTicketViewModel model)
+        {
+            var checkuser = db.users.FirstOrDefault(x => x.Id == model.UserId);
+            if (checkuser != null)
+            {
+                Tickets newticket = new Tickets();
+                newticket.Title = model.Title;
+                newticket.Description = model.Description;
+                newticket.Importance = model.Importance;
+                newticket.SendDate = DateTime.Now;
+                newticket.Status = "باز";
+                newticket.UserId = model.UserId;
+                //?  newticket.Document=model.Document;
+
+                db.tickets.Add(newticket);
+                db.SaveChanges();
+                return Ok(new { message = "تیکت با موفقیت ثبت شد", newticket });
+            }
+            else
+            {
+
+                return BadRequest(new { message = "کاربری یافت نشد", StatusCode = 400 });
+            }
+        }
+
+        //encrypt and decrypt
         [HttpGet("/GenerateKey")]
         public IActionResult GenerateKey()
         {
@@ -222,6 +316,11 @@ namespace GiftStore.API
 
         }
 
+
+
+
+
+        ///gift cards
         [HttpPost("/AddGiftCart")]
         public IActionResult AddGiftCart(string code, string country, string label, string type, double price, DateTime expdate, string status, string directory)
         {
@@ -230,11 +329,26 @@ namespace GiftStore.API
             string IVKey = "";
             var result = en.Encrypt(code, Key, out IVKey);
 
+            //create uniqe label
+
+            var randomdigit = en.GenerateRandom10DigitNumber();
+
+            var searchlabel = db.giftCards.Where(x => x.label == randomdigit).ToList();
+
+
+            while (searchlabel.Any())
+            {
+                randomdigit=en.GenerateRandom10DigitNumber();
+            }
+            
+
+
+
             GiftCards newCard = new GiftCards
             {
                 Code = result,
                 Country = country,
-                label = en.GenerateRandom10DigitNumber(),
+                label = randomdigit,
                 type = type,
                 Price = price,
                 ExpDate = expdate,
@@ -309,6 +423,26 @@ namespace GiftStore.API
         }
 
 
+
+        [HttpGet("/GetAllGiftCards")]
+
+        public IActionResult GetAllGiftCards()
+        {
+
+
+            List<GiftCards> allgiftcards = db.giftCards.ToList();
+            if (allgiftcards.Count <= 0)
+            {
+                return NotFound(new { message = "No giftcard  found ", StatusCode = 404 });
+            }
+            else
+            {
+
+
+                          return Ok(allgiftcards);
+
+             }
+        }
 
 
         [HttpGet("/SearchGiftCardByStatus")]
@@ -407,42 +541,115 @@ namespace GiftStore.API
 
             }
         }
-        [HttpPut("/ActiveUser")]
-        public IActionResult ActiveUser(string phone)
+
+
+
+
+
+
+
+
+
+
+
+
+
+        //tickets
+
+        //  - مشاهده درخواست‌های پشتیبانی ارسال شده توسط کاربر.
+        [HttpGet("/ShowUserTickets")]
+        public IActionResult ShowUserTickets(int id)
         {
-            var user = db.users.FirstOrDefault(u => u.Phone == phone);
-            if (user==null)
+            var tickets = db.tickets.Where(t => t.UserId==id).ToList();
+            if (!tickets.Any())
             {
-                return NotFound(new { message = "کاربری با این شماره تلفن یافت نشد ", StatusCode = 404 });
+                return BadRequest(new { message = "درخواستی از طرف این کاربر وجود ندارد", StatusCode = 400 });
+
+            }
+            else{
+                return Ok(tickets);
+            }
+
+
+        }
+        [HttpGet("/GetAllTickets")]
+        public IActionResult GetAllTickets()
+        {
+            var tickets = db.tickets.ToList();
+            if (!tickets.Any())
+            {
+                return BadRequest(new { message = "درخواستی از طرف این کاربر وجود ندارد", StatusCode = 400 });
+
             }
             else
             {
-
-
-               user.Active = true;
-                db.SaveChanges();
-                return Ok(new {user,message="کاربر فعال شد",StatusCode=200});
-
+                return Ok(tickets);
             }
+
+
         }
 
-        [HttpPut("/DactiveUser")]
-        public IActionResult DactiveUser(string phone)
+
+
+        [HttpGet("/GetAllTicketsByImportance")]
+        public IActionResult GetAllTicketsByImportance()
         {
-            var user = db.users.FirstOrDefault(u => u.Phone == phone);
-            if (user == null)
+            var tickets = db.tickets.OrderByDescending(t => t.Importance).ToList();
+
+            // Check if the tickets list is empty
+            if (!tickets.Any())
             {
-                return NotFound(new { message = "کاربری با این شماره تلفن یافت نشد ", StatusCode = 404 });
+                return BadRequest(new { message = "درخواستی از طرف این کاربر وجود ندارد", StatusCode = 400 });
             }
             else
             {
+                return Ok(tickets);
+            }
 
 
-                user.Active = false;
-                db.SaveChanges();
-                return Ok(new { user, message = "کاربر غیر فعال شد", StatusCode = 200 });
+        }
 
+        [HttpGet("/GetAllTicketsByStatus")]
+
+        public IActionResult GetAllTicketsByStatus(string status)
+        {
+            var tickets = db.tickets.Where(t => t.Status==status).ToList();
+
+            // Check if the tickets list is empty
+            if (!tickets.Any())
+            {
+                return BadRequest(new { message = "درخواستی از طرف این کاربر وجود ندارد", StatusCode = 400 });
+            }
+            else
+            {
+                return Ok(tickets);
+            }
+
+
+        }
+
+        [HttpPut("/SendResponeToTickets")]
+
+        public IActionResult SendResponeToTickets(int id,string response)
+        {
+
+            var ticket= db.tickets.FirstOrDefault(u => u.Id == id);
+            if (ticket != null)
+            {
+
+            ticket.response=response;
+            ticket.responseDate= DateTime.Now;
+            ticket.Status= "پاسخ داده شده";
+            
+            db.SaveChanges();
+                return Ok(new {message="تیکت با موفقیت پاسخ داده شد",StatusCode=200,ticket});
+            }
+            else
+            {
+                return BadRequest(new {message="تیکتی یافت نشد", StatusCode = 400 });
+            }
+
+               
             }
         }
     }
-}
