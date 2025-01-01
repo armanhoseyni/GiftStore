@@ -12,6 +12,7 @@ using System.Net.Sockets;
 using DocumentFormat.OpenXml.InkML;
 using System.Text.Json.Serialization;
 using System.Text.Json;
+using System.Globalization;
 
 
 namespace GiftStore.API
@@ -32,7 +33,7 @@ namespace GiftStore.API
             var Allcontactus = db.contact_Us.ToList();
             if (Allcontactus.Count <= 0)
             {
-                return NotFound(new { Status = false, Allcontactus});
+                return Ok(new { Status = false, Allcontactus});
             }
             return Ok(new { Status = true, Allcontactus });
         }
@@ -44,7 +45,7 @@ namespace GiftStore.API
 
             if (allUsers.Count <= 0)
             {
-                return NotFound(new { Status = false,allUsers});
+                return Ok(new { Status = false,allUsers});
             }
 
             return Ok(new { Status = true,allUsers });
@@ -70,7 +71,7 @@ namespace GiftStore.API
             var allusers = db.users.Where(x => x.Role == "User").ToList();
             if (allusers.Count <= 0)
             {
-                return NotFound(new { Status = false ,allusers });
+                return Ok(new { Status = false ,allusers });
             }
             return Ok(new { Status = true, count = allusers.Count });
         }
@@ -116,7 +117,7 @@ namespace GiftStore.API
             var user = db.users.FirstOrDefault(u => u.Phone ==Phone);
 
             if (user == null)
-                return NotFound(new { Status = false, message = "User not found", user });
+                return Ok(new { Status = false, message = "User not found", user });
 
          
             if (!string.IsNullOrWhiteSpace(model.FirstName))
@@ -141,7 +142,7 @@ namespace GiftStore.API
         {
             var user = db.users.FirstOrDefault(u => u.Id == id);
             if (user == null)
-                return NotFound(new { Status = false, message = "User not found", user });
+                return Ok(new { Status = false, message = "User not found", user });
 
             db.users.Remove(user);
             db.SaveChanges();
@@ -153,7 +154,7 @@ namespace GiftStore.API
         {
             var user = db.users.FirstOrDefault(u => u.Id == id);
             if (user == null)
-                return NotFound(new { Status = false, message = "User not found", user });
+                return Ok(new { Status = false, message = "User not found", user });
 
             return Ok(new { Status = true, user });
         }
@@ -163,7 +164,7 @@ namespace GiftStore.API
         {
             var users = db.users.Where(u => u.Phone.Contains(phone)).ToList();
             if (!users.Any())
-                return NotFound(new { Status = false, message = "کاربری با این اطلاعات یافت نشد", users });
+                return Ok(new { Status = false, message = "کاربری با این اطلاعات یافت نشد", users });
 
             return Ok(new { Status = true, users });
         }
@@ -174,7 +175,7 @@ namespace GiftStore.API
             var exists = db.users.Any(u => u.Phone == phone);
             if (!exists)
             {
-                return NotFound(new { Status = false, message = "No user exists with this phone number", exists });
+                return Ok(new { Status = false, message = "No user exists with this phone number", exists });
             }
             return Ok(new { Status = true, Exists = exists, StatusCode = 200 });
         }
@@ -192,7 +193,7 @@ namespace GiftStore.API
             var user = db.users.FirstOrDefault(u => u.Phone == phone);
             if (user == null)
             {
-                return NotFound(new { Status = false, message = "کاربری با این شماره تلفن یافت نشد", user });
+                return Ok(new { Status = false, message = "کاربری با این شماره تلفن یافت نشد", user });
             }
 
             user.Active = !user.Active;
@@ -216,7 +217,7 @@ namespace GiftStore.API
             var ResponsesTickets = db.tickets.Where(x => x.UserId == id && x.Status == "پاسخ داده شده").ToList();
             if (ResponsesTickets.Count <= 0)
             {
-                return BadRequest(new { Status = false, message = "تیکتی پاسخ داده نشده", StatusCode = 400 });
+                return Ok(new { Status = false, message = "تیکتی پاسخ داده نشده", StatusCode = 200 });
             }
             return Ok(new { Status = true, ResponsesTickets });
         }
@@ -227,7 +228,7 @@ namespace GiftStore.API
             var ResponsesTickets = db.tickets.Where(x => x.UserId == id).ToList();
             if (ResponsesTickets.Count <= 0)
             {
-                return BadRequest(new { Status = false, message = "تیکتی موجود نمیباشد", StatusCode = 400 });
+                return Ok(new { Status = false, message = "تیکتی موجود نمیباشد", StatusCode = 200 });
             }
             return Ok(new { Status = true, ResponsesTickets });
         }
@@ -611,7 +612,7 @@ namespace GiftStore.API
             string filePath = @"wwwroot/GiftCards/GiftCards.xlsx/GiftCards.xlsx";
             if (!System.IO.File.Exists(filePath))
             {
-                return NotFound(new { Status = false, message = "Excel file not found.", StatusCode = 404 });
+                return Ok(new { Status = false, message = "Excel file not found.", StatusCode = 404 });
             }
 
             IXLWorkbook workbook;
@@ -629,7 +630,7 @@ namespace GiftStore.API
 
             if (row == null)
             {
-                return NotFound(new { Status = false, message = "Label not found in the Excel file.", StatusCode = 404 });
+                return Ok(new { Status = false, message = "Label not found in the Excel file.", StatusCode = 404 });
             }
 
             var giftCardInfo = new
@@ -682,7 +683,7 @@ namespace GiftStore.API
             List<GiftCards> allgiftcards = db.giftCards.ToList();
             if (allgiftcards.Count <= 0)
             {
-                return NotFound(new { Status = false, message = "No giftcard found", allgiftcards });
+                return Ok(new { Status = false, message = "No giftcard found", allgiftcards });
             }
             return Ok(new { Status = true, allgiftcards });
         }
@@ -704,7 +705,7 @@ namespace GiftStore.API
             var giftcards = query.ToList();
             if (!giftcards.Any())
             {
-                return NotFound(new { Status = false, message = "گیفت کارتی با چنین وضعیتی وجود ندارد", giftcards });
+                return Ok(new { Status = false, message = "گیفت کارتی با چنین وضعیتی وجود ندارد", giftcards });
             }
             return Ok(new { Status = true, giftcards });
         }
@@ -714,7 +715,7 @@ namespace GiftStore.API
         {
             var Gc = db.giftCards.FirstOrDefault(u => u.label == label);
             if (Gc == null)
-                return NotFound(new { Status = false, message = "گیفت کارت پیدا نشد", Gc });
+                return Ok(new { Status = false, message = "گیفت کارت پیدا نشد", Gc });
 
             if (DeleteRow(label))
             {
@@ -722,7 +723,7 @@ namespace GiftStore.API
                 db.SaveChanges();
                 return Ok(new { Status = true, message = "گیفت کارت با موفقیت حذف شد" });
             }
-            return NotFound(new { Status = false, message = "خطا در حذف گیفت کارت" });
+            return Ok(new { Status = false, message = "خطا در حذف گیفت کارت" });
         }
 
         private bool DeleteRow(string label)
@@ -765,7 +766,7 @@ namespace GiftStore.API
             var giftcard = db.giftCards.FirstOrDefault(u => u.label == label);
             if (giftcard == null)
             {
-                return NotFound(new { Status = false, message = "گیفت کارتی با این لیبل یافت نشد", giftcard });
+                return Ok(new { Status = false, message = "گیفت کارتی با این لیبل یافت نشد", giftcard });
             }
 
             InfoSec en = new InfoSec();
@@ -826,10 +827,10 @@ namespace GiftStore.API
         [HttpGet("/SoldGiftsCount")]
         public IActionResult SoldGiftsCount()
         {
-            var soldgiftcards = db.giftCards.Where(u => u.Status == "فروخته شده").ToList();
-            if (soldgiftcards.Count <= 0)
+            var soldgiftcards = db.giftCards.Where(u => u.Status == "فروخته شده").ToList().Count();
+            if (soldgiftcards<= 0)
             {
-                return NotFound(new { Status = false, soldgiftcards});
+                return Ok(new { Status = false, soldgiftcards});
             }
             return Ok(new { Status = true, soldgiftcards });
         }
@@ -865,7 +866,7 @@ namespace GiftStore.API
             var tickets = db.tickets.Where(t => t.UserId == id).ToList();
             if (!tickets.Any())
             {
-                return BadRequest(new { Status = false, message = "درخواستی از طرف این کاربر وجود ندارد", StatusCode = 400 });
+                return Ok(new { Status = false,tickets, message = "درخواستی از طرف این کاربر وجود ندارد", StatusCode = 200 });
             }
             return Ok(new { Status = true, tickets });
         }
@@ -875,7 +876,7 @@ namespace GiftStore.API
             var chat = db.ticketChats.Where(t => t.TicketId == id).ToList();
             if (!chat.Any())
             {
-                return BadRequest(new { Status = false,chat, message = "درخواستی از طرف این کاربر وجود ندارد", StatusCode = 400 });
+                return Ok(new { Status = false,chat, message = "درخواستی از طرف این کاربر وجود ندارد", StatusCode = 200 });
             }
             return Ok(new { Status = true, chat });
         }
@@ -885,18 +886,18 @@ namespace GiftStore.API
             var user = db.tickets.FirstOrDefault(t => t.Id == id);
             if (user == null)
             {
-                return BadRequest(new { Status = false, message = "چنین کاربری موجود نمیباشد", StatusCode = 400 });
+                return Ok(new { Status = false,user, message = "چنین کاربری موجود نمیباشد", StatusCode = 200 });
             }
 
             string filePath = db.tickets.FirstOrDefault(x => x.Id == id).DocumentPath;
             if (filePath == null)
             {
-                return BadRequest(new { Status = false, message = "فایلی موجود نمیباشد", StatusCode = 400 });
+                return Ok(new { Status = false,filePath, message = "فایلی موجود نمیباشد", StatusCode = 200 });
             }
 
             if (!System.IO.File.Exists(filePath))
             {
-                return NotFound(new { Status = false, message = "File not found or path is invalid." });
+                return Ok(new { Status = false, message = "File not found or path is invalid." });
             }
 
             string contentType = GetContentType(filePath);
@@ -926,7 +927,7 @@ namespace GiftStore.API
             var tickets = db.tickets.ToList();
             if (!tickets.Any())
             {
-                return BadRequest(new { Status = false, message = "درخواستی از طرف این کاربر وجود ندارد", StatusCode = 400 });
+                return BadRequest(new { Status = false, message = "درخواستی از طرف این کاربر وجود ندارد", StatusCode = 200 });
             }
             return Ok(new { Status = true, tickets });
         }
@@ -937,7 +938,7 @@ namespace GiftStore.API
             var tickets = db.tickets.OrderByDescending(t => t.Importance).ToList();
             if (!tickets.Any())
             {
-                return BadRequest(new { Status = false, message = "درخواستی از طرف این کاربر وجود ندارد", StatusCode = 400 });
+                return BadRequest(new { Status = false, message = "درخواستی از طرف این کاربر وجود ندارد", StatusCode = 200 });
             }
             return Ok(new { Status = true, tickets });
         }
@@ -948,7 +949,7 @@ namespace GiftStore.API
             var tickets = db.tickets.Where(t => t.Status == status).ToList();
             if (!tickets.Any())
             {
-                return BadRequest(new { Status = false, message = "درخواستی از طرف این کاربر وجود ندارد", StatusCode = 400 });
+                return BadRequest(new { Status = false, message = "درخواستی از طرف این کاربر وجود ندارد", StatusCode = 200 });
             }
             return Ok(new { Status = true, tickets });
         }
@@ -959,7 +960,7 @@ namespace GiftStore.API
             var chat = db.tickets.FirstOrDefault(u => u.Id == id);
             if (chat == null)
             {
-                return BadRequest(new { Status = false,chat, message = "تیکتی یافت نشد", StatusCode = 400 });
+                return BadRequest(new { Status = false,chat, message = "تیکتی یافت نشد", StatusCode = 200 });
             }
             TicketChats newRes= new TicketChats();
 
@@ -978,7 +979,7 @@ namespace GiftStore.API
             var ticket = db.tickets.FirstOrDefault(u => u.Id == id);
             if (ticket == null)
             {
-                return BadRequest(new { Status = false, ticket, message = "تیکتی یافت نشد", StatusCode = 400 });
+                return BadRequest(new { Status = false, ticket, message = "تیکتی یافت نشد", StatusCode = 200 });
             }
 
             ticket.Status = "بسته شده";
@@ -1069,7 +1070,7 @@ namespace GiftStore.API
                 }
                 else
                 {
-                    return NotFound(new { Status = false, message = "به این درخاست قبلا رسیدگی شده است" });
+                    return Ok(new { Status = false, message = "به این درخاست قبلا رسیدگی شده است" });
 
                 }
             }
@@ -1146,6 +1147,58 @@ namespace GiftStore.API
 
             return Ok(factors); // Return the list of factors
         }
+        [HttpGet("/GetAllFactorsFail")]
+        public IActionResult GetAllFactorsFail()
+        {
+            var factors = db.factors
+                .Include(f => f.GiftCard) // Include the GiftCard navigation property
+                .Where(f => f.Status == false) // Filter factors with Status == false
+                .Select(f => new
+                {
+                    // Fields from the Factors table
+                    FactorId = f.Id,
+                    UserId = f.UserId,
+                    FactorDate = f.FactorDate,
+                    GiftId = f.GiftId,
+                    Status = f.Status,
+                    Type = f.Type,
+                    TransActionNumber = f.TransActionNumber,
+                    FactorPrice = f.FactorPrice,
+                    // Price from the GiftCards table (handle null GiftCard)
+                    GiftCardPrice = f.GiftCard != null ? f.GiftCard.Price : (double?)null
+                })
+                .ToList();
+
+            return Ok(factors); // Return the filtered list of factors
+        }
+
+
+
+
+        [HttpGet("/GetAllFactorsTrue")]
+        public IActionResult GetAllFactorsTrue()
+        {
+            var factors = db.factors
+                .Include(f => f.GiftCard) // Include the GiftCard navigation property
+                .Where(f => f.Status == true) // Filter factors with Status == false
+                .Select(f => new
+                {
+                    // Fields from the Factors table
+                    FactorId = f.Id,
+                    UserId = f.UserId,
+                    FactorDate = f.FactorDate,
+                    GiftId = f.GiftId,
+                    Status = f.Status,
+                    Type = f.Type,
+                    TransActionNumber = f.TransActionNumber,
+                    FactorPrice = f.FactorPrice,
+                    // Price from the GiftCards table (handle null GiftCard)
+                    GiftCardPrice = f.GiftCard != null ? f.GiftCard.Price : (double?)null
+                })
+                .ToList();
+
+            return Ok(factors); // Return the filtered list of factors
+        }
         [HttpGet("sum-payments")]
         public IActionResult SumPayments()
         {
@@ -1169,7 +1222,6 @@ namespace GiftStore.API
             });
         }
 
-
         [HttpGet("/GetIncomeData")]
         public IActionResult GetIncomeData()
         {
@@ -1188,12 +1240,24 @@ namespace GiftStore.API
                 .OrderBy(m => m.Month) // Order by month
                 .ToList();
 
-            // Convert month numbers to month names and format the result
-            var monthlyIncomeResult = monthlyIncome.Select(m => new
+            // Initialize a dictionary with all 12 months and default sales value of 0.0 (double)
+            var allMonths = Enumerable.Range(1, 12).ToDictionary(
+                month => month,
+                month => new { name = new DateTime(currentYear, month, 1).ToString("MMMM"), sales = 0.0 } // Use 0.0 for double
+            );
+
+            // Update the dictionary with data from the query
+            foreach (var income in monthlyIncome)
             {
-                name = new DateTime(currentYear, m.Month, 1).ToString("MMMM"), // Month name
-                sales = m.Sales // Total income for the month
-            });
+                allMonths[income.Month] = new
+                {
+                    name = new DateTime(currentYear, income.Month, 1).ToString("MMMM"),
+                    sales = income.Sales // This is already a double
+                };
+            }
+
+            // Convert the dictionary to a list of monthly income results
+            var monthlyIncomeResult = allMonths.Values.OrderBy(m => DateTime.ParseExact(m.name, "MMMM", CultureInfo.InvariantCulture).Month).ToList();
 
             // Query to group factors by GiftCard type and sum PaymentAmount for gift card type percentages
             var giftCardTypeIncome = db.factors

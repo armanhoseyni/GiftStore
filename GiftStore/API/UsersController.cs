@@ -29,7 +29,7 @@ namespace GiftStore.API
 
             if (checkuser == null)
             {
-                return BadRequest(new { Status = false, message = "کاربری یافت نشد", StatusCode = 400 });
+                return BadRequest(new { Status = false, message = "کاربری یافت نشد", StatusCode = 200 });
             }
 
             Tickets newticket = new Tickets
@@ -67,7 +67,7 @@ namespace GiftStore.API
             var ticket = db.tickets.FirstOrDefault(t => t.Id == id);
             if (ticket == null)
             {
-                return BadRequest(new { Status = false, message = "تیکتی با این شناسه یافت نشد", StatusCode = 400 });
+                return BadRequest(new { Status = false, message = "تیکتی با این شناسه یافت نشد", StatusCode = 200 });
             }
 
             // Define the directory to save the file
@@ -79,7 +79,7 @@ namespace GiftStore.API
 
             if (string.IsNullOrEmpty(documentPath))
             {
-                return BadRequest(new { Status = false, message = "خطا در آپلود فایل", StatusCode = 400 });
+                return BadRequest(new { Status = false, message = "خطا در آپلود فایل", StatusCode = 200 });
             }
 
             // Update the DocumentPath field in the ticket
@@ -96,26 +96,22 @@ namespace GiftStore.API
         {
             Services.Documents documentsService = new Services.Documents();
 
-            var user = db.tickets.FirstOrDefault(t => t.Id == id);
-            if (user == null)
+            var image = db.tickets.FirstOrDefault(t => t.Id == id);
+            if (image == null)
             {
-                return BadRequest(new { Status = false, message = "چنین کاربری موجود نمیباشد", StatusCode = 400 });
+                return Ok(new { Status = false, message = "چنین کاربری موجود نمیباشد", image });
             }
 
             string filePath = db.tickets.FirstOrDefault(x => x.Id == id).DocumentPath;
             if (filePath == null)
             {
-                return BadRequest(new { Status = false, message = "فایلی موجود نمیباشد", StatusCode = 400 });
+                return BadRequest(new { Status = false, message = "فایلی موجود نمیباشد", StatusCode = 200 });
             }
 
-            if (string.IsNullOrEmpty(filePath) || !System.IO.File.Exists(filePath))
-            {
-                return NotFound(new { Status = false, message = "File not found or path is invalid." });
-            }
            
-            string contentType = documentsService.GetContentType(filePath);
-            var fileStream = System.IO.File.OpenRead(filePath);
-            return File(fileStream, contentType);
+           // string contentType = documentsService.GetContentType(filePath);
+            //var fileStream = System.IO.File.OpenRead(filePath);
+            return Ok(new {File= filePath });
         }
 
         /// <summary>
@@ -132,7 +128,7 @@ namespace GiftStore.API
             var user = db.users.FirstOrDefault(x => x.Id == id);
             if (user == null)
             {
-                return BadRequest(new { Status = false, message = "چنین کاربری موجود نمیباشد", StatusCode = 400 });
+                return BadRequest(new { Status = false, message = "چنین کاربری موجود نمیباشد", StatusCode = 200 });
             }
 
             var tickets = db.tickets.Where(x => x.UserId == id).ToList();
@@ -167,20 +163,20 @@ namespace GiftStore.API
             var ticket = db.tickets.FirstOrDefault(t => t.Id == id);
             if (ticket == null)
             {
-                return BadRequest(new { Status = false, message = "چنین کاربری موجود نمیباشد", StatusCode = 400 });
+                return BadRequest(new { Status = false, message = "چنین کاربری موجود نمیباشد", ticket });
             }
 
             // Get the file path from the ticket
             string filePath = ticket.DocumentPath;
             if (string.IsNullOrEmpty(filePath))
             {
-                return BadRequest(new { Status = false, message = "فایلی موجود نمیباشد", StatusCode = 400 });
+                return BadRequest(new { Status = false, message = "فایلی موجود نمیباشد", StatusCode = 200 });
             }
 
             // Check if the file exists
             if (!System.IO.File.Exists(filePath))
             {
-                return NotFound(new { Status = false, message = "File not found or path is invalid." });
+                return Ok(new { Status = false, message = "File not found or path is invalid." });
             }
 
             try
@@ -207,7 +203,7 @@ namespace GiftStore.API
             var user = db.users.FirstOrDefault(x => x.Id == id);
             if (user == null)
             {
-                return BadRequest(new { Status = false, message = "چنین کاربری موجود نمیباشد", StatusCode = 400 });
+                return BadRequest(new { Status = false, message = "چنین کاربری موجود نمیباشد", StatusCode = 200 });
             }
 
             var wallet = user.wallet;
@@ -228,7 +224,7 @@ namespace GiftStore.API
             }
             else
             {
-                return NotFound(new { Status = false});
+                return Ok(new { Status = false});
 
 
             }
@@ -249,7 +245,7 @@ namespace GiftStore.API
 
                 if (user == null)
                 {
-                    return NotFound("User not found");
+                    return Ok("User not found");
                 }
 
                 // Create a new UserStarsLog entry
@@ -275,7 +271,7 @@ namespace GiftStore.API
             else
             {
 
-                return NotFound(new {Status=false,message="تعداد ستاره های شماره کمتراز حد مجاز است",MinStarNeed=minStars});
+                return Ok(new {Status=false,message="تعداد ستاره های شماره کمتراز حد مجاز است",MinStarNeed=minStars});
 
             }
 
