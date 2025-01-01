@@ -59,41 +59,36 @@ namespace GiftStore.Services
 
 
 
-        public string Decrypt(string CipherText, string Key, string IVKey)
+        public string Decrypt(string cipherText, string key, string ivKey)
         {
-
-
             using (Aes aes = Aes.Create())
             {
+                // Set padding mode to Zeros
                 aes.Padding = PaddingMode.Zeros;
-                aes.Key = Convert.FromBase64String(Key);
-                aes.IV = Convert.FromBase64String(IVKey);
+                aes.Key = Convert.FromBase64String(key);
+                aes.IV = Convert.FromBase64String(ivKey);
 
+                // Create a decryptor
+                ICryptoTransform decryptor = aes.CreateDecryptor(aes.Key, aes.IV);
 
+                // Convert the cipher text to a byte array
+                byte[] cipherBytes = Convert.FromBase64String(cipherText);
 
-                ICryptoTransform decryptor = aes.CreateDecryptor();
-
-
-                string PlainText = "";
-                byte[] ciper = Convert.FromBase64String(CipherText);
-
-
-                using (MemoryStream ms = new MemoryStream(ciper))
+                // Decrypt the data
+                using (MemoryStream ms = new MemoryStream(cipherBytes))
+                using (CryptoStream cs = new CryptoStream(ms, decryptor, CryptoStreamMode.Read))
+                using (StreamReader sr = new StreamReader(cs))
                 {
-                    using (CryptoStream cs = new CryptoStream(ms, decryptor, CryptoStreamMode.Read))
-                    {
-                        using (StreamReader sr = new StreamReader(cs))
-                        {
-                            PlainText = sr.ReadToEnd();
-                        }
+                    // Read the decrypted data
+                    string plainText = sr.ReadToEnd();
 
-                    }
+                    // Remove padding (null characters)
+                    plainText = plainText.TrimEnd('\0');
 
+                    return plainText;
                 }
-                return PlainText;
             }
-
-
+        
 
         }
         public string GenerateRandom10DigitNumber()

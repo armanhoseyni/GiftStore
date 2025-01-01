@@ -20,10 +20,10 @@ namespace GiftStore.Models
         public bool Active { get; set; }
 
         public string  RegisterDate{ get; set; }
-        public string  Role{ get; set; }
+        public string?  Role{ get; set; }
 
         public double? wallet {  get; set; }
-
+        public ICollection<WalletLog> WalletLogs { get; set; } // Navigation property to WalletLog
 
     }
 }
