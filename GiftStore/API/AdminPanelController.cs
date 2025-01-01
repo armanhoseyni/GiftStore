@@ -954,7 +954,7 @@ namespace GiftStore.API
         }
 
         [HttpPost("/SendResponeToTickets")]
-        public IActionResult SendResponeToTickets([FromQuery] int id, [FromQuery] string response)
+        public IActionResult SendResponeToTickets([FromQuery] int id, [FromBody] ViewModelResponseToTickets model )
         {
             var chat = db.tickets.FirstOrDefault(u => u.Id == id);
             if (chat == null)
@@ -965,7 +965,7 @@ namespace GiftStore.API
 
             newRes.Sender = 1;
             newRes.SendDate = DateTime.Now;
-            newRes.message=response;
+            newRes.message=model.Response;
             newRes.TicketId = id;
             db.ticketChats.Add(newRes);
             db.SaveChanges();
