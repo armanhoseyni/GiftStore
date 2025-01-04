@@ -24,6 +24,7 @@ namespace GiftStore.Models
 
         public double? wallet {  get; set; }
         public ICollection<WalletLog> WalletLogs { get; set; } // Navigation property to WalletLog
+        public ICollection<ActivityLog> activityLogs { get; set; } // Navigation property to WalletLog
 
     }
 }

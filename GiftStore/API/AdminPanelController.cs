@@ -31,10 +31,7 @@ namespace GiftStore.API
         public IActionResult GetAllContactUs()
         {
             var Allcontactus = db.contact_Us.ToList();
-            if (Allcontactus.Count <= 0)
-            {
-                return Ok(new { Status = false, Allcontactus});
-            }
+           
             return Ok(new { Status = true, Allcontactus });
         }
         // Users
@@ -43,11 +40,7 @@ namespace GiftStore.API
         {
             var allUsers = db.users.ToList();
 
-            if (allUsers.Count <= 0)
-            {
-                return Ok(new { Status = false,allUsers});
-            }
-
+          
             return Ok(new { Status = true,allUsers });
         }
 
@@ -56,10 +49,7 @@ namespace GiftStore.API
         public IActionResult GetUserWalletLogs([FromQuery] int id)
         {
             var AllTransactions = db.walletLogs.Where(x=>x.UserId==id);
-            if (AllTransactions.Count()==0)
-            {
-                return Ok(new { Status = false, AllTransactions });
-            }
+        
             return Ok(new {Status=true, AllTransactions });
 
 
@@ -69,10 +59,7 @@ namespace GiftStore.API
         public IActionResult GetAllUsersCounts()
         {
             var allusers = db.users.Where(x => x.Role == "User").ToList();
-            if (allusers.Count <= 0)
-            {
-                return Ok(new { Status = false ,allusers });
-            }
+         
             return Ok(new { Status = true, count = allusers.Count });
         }
 
@@ -106,9 +93,18 @@ namespace GiftStore.API
             };
 
             db.users.Add(user);
-            db.SaveChanges();
+            if (db.SaveChanges()==1)
+            {
+                return Ok(new { Status = true, message = "User added successfully.", User = user });
 
-            return Ok(new { Status = true, message = "User added successfully.", User = user });
+            }
+            else
+            {
+                return BadRequest(new { Status = false, message = "fail", User = user });
+
+            }
+
+
         }
 
         [HttpPost("/UpdateUser")]
@@ -117,7 +113,7 @@ namespace GiftStore.API
             var user = db.users.FirstOrDefault(u => u.Phone ==Phone);
 
             if (user == null)
-                return Ok(new { Status = false, message = "User not found", user });
+                return BadRequest(new { Status = false, message = "User not found", user });
 
          
             if (!string.IsNullOrWhiteSpace(model.FirstName))
@@ -142,7 +138,7 @@ namespace GiftStore.API
         {
             var user = db.users.FirstOrDefault(u => u.Id == id);
             if (user == null)
-                return Ok(new { Status = false, message = "User not found", user });
+                return BadRequest(new { Status = false, message = "User not found", user });
 
             db.users.Remove(user);
             db.SaveChanges();
@@ -153,30 +149,32 @@ namespace GiftStore.API
         public IActionResult GetUserById([FromQuery] int id)
         {
             var user = db.users.FirstOrDefault(u => u.Id == id);
-            if (user == null)
-                return Ok(new { Status = false, message = "User not found", user });
-
+          
             return Ok(new { Status = true, user });
         }
 
         [HttpGet("/SearchUsersByPhone")]
-        public IActionResult SearchUsersByPhone([FromQuery] string phone)
+        public IActionResult SearchUsersByPhone([FromQuery] string? phone)
         {
-            var users = db.users.Where(u => u.Phone.Contains(phone)).ToList();
-            if (!users.Any())
-                return Ok(new { Status = false, message = "کاربری با این اطلاعات یافت نشد", users });
+            if (string.IsNullOrEmpty(phone))
+            {
+                var usersall = db.users.ToList();
 
+                return Ok(new { Status = true, usersall });
+
+
+            }
+            var users = db.users.Where(u => u.Phone.Contains(phone)).ToList();
+          
             return Ok(new { Status = true, users });
+
         }
 
         [HttpGet("/CheckUserExists")]
         public IActionResult CheckUserExists([FromQuery] string phone)
         {
             var exists = db.users.Any(u => u.Phone == phone);
-            if (!exists)
-            {
-                return Ok(new { Status = false, message = "No user exists with this phone number", exists });
-            }
+            
             return Ok(new { Status = true, Exists = exists, StatusCode = 200 });
         }
 
@@ -215,10 +213,7 @@ namespace GiftStore.API
         public IActionResult ShowRespons([FromQuery] int id)
         {
             var ResponsesTickets = db.tickets.Where(x => x.UserId == id && x.Status == "پاسخ داده شده").ToList();
-            if (ResponsesTickets.Count <= 0)
-            {
-                return Ok(new { Status = false, message = "تیکتی پاسخ داده نشده", StatusCode = 200 });
-            }
+           
             return Ok(new { Status = true, ResponsesTickets });
         }
 
@@ -226,10 +221,7 @@ namespace GiftStore.API
         public IActionResult ShowAllUsersTickets([FromQuery] int id)
         {
             var ResponsesTickets = db.tickets.Where(x => x.UserId == id).ToList();
-            if (ResponsesTickets.Count <= 0)
-            {
-                return Ok(new { Status = false, message = "تیکتی موجود نمیباشد", StatusCode = 200 });
-            }
+           
             return Ok(new { Status = true, ResponsesTickets });
         }
 
@@ -385,12 +377,12 @@ namespace GiftStore.API
         {
             if (file == null || file.Length == 0)
             {
-                return BadRequest(new { message = "No file uploaded." });
+                return BadRequest(new { Status=false,message = "No file uploaded." });
             }
 
             if (Path.GetExtension(file.FileName).ToLower() != ".xlsx")
             {
-                return BadRequest(new { message = "Invalid file format. Please upload an Excel file." });
+                return BadRequest(new {Status=false ,message = "Invalid file format. Please upload an Excel file." });
             }
 
             try
@@ -403,7 +395,7 @@ namespace GiftStore.API
                         var worksheet = package.Workbook.Worksheets[0];
                         if (worksheet.Dimension == null)
                         {
-                            return BadRequest(new { message = "The Excel file is empty." });
+                            return Ok(new { Status=true,message = "The Excel file is empty." });
                         }
 
                         var rowCount = worksheet.Dimension.Rows;
@@ -416,7 +408,7 @@ namespace GiftStore.API
                         var requiredHeaders = new List<string> { "Code", "Country", "type", "Price", "ExpDate", "status" };
                         if (!requiredHeaders.All(h => headers.Contains(h)))
                         {
-                            return BadRequest(new { message = "Invalid Excel file format. Required columns are missing." });
+                            return Ok(new { message = "Invalid Excel file format. Required columns are missing." });
                         }
 
                         // Process each row
@@ -549,19 +541,26 @@ namespace GiftStore.API
             };
 
             db.giftCards.Add(newCard);
-            db.SaveChanges();
-
-            string directory = @"wwwroot/GiftCards/GiftCards.xlsx";
-            SaveToExcel1(newCard.Id, randomdigit, result, Key, IVKey, directory);
-
-            string filePath = @"wwwroot/GiftCards/GiftCards.xlsx";
-            if (System.IO.File.Exists(filePath))
+            if (db.SaveChanges() == 1)
             {
-                byte[] fileBytes = System.IO.File.ReadAllBytes(filePath);
-                return File(fileBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "GiftCards.xlsx");
-            }
 
-            return Ok(new { Status = true, newCard, message = "کارت با موفقیت ثبت شد", StatusCode = 200 });
+                string directory = @"wwwroot/GiftCards/GiftCards.xlsx";
+                SaveToExcel1(newCard.Id, randomdigit, result, Key, IVKey, directory);
+
+                string filePath = @"wwwroot/GiftCards/GiftCards.xlsx";
+                if (System.IO.File.Exists(filePath))
+                {
+                    byte[] fileBytes = System.IO.File.ReadAllBytes(filePath);
+                    return File(fileBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "GiftCards.xlsx");
+                }
+
+                return Ok(new { Status = true, newCard, message = "کارت با موفقیت ثبت شد", StatusCode = 200 });
+            }
+            else
+                return Ok(new { Status = false, message = "Failed " });
+
+
+            
         }
 
         private void SaveToExcel1(int id, string label, string result, string key, string ivKey, string directory)
@@ -612,7 +611,7 @@ namespace GiftStore.API
             string filePath = @"wwwroot/GiftCards/GiftCards.xlsx/GiftCards.xlsx";
             if (!System.IO.File.Exists(filePath))
             {
-                return Ok(new { Status = false, message = "Excel file not found.", StatusCode = 404 });
+                return Ok(new { Status = true, message = "Excel file not found.", StatusCode = 404 });
             }
 
             IXLWorkbook workbook;
@@ -622,7 +621,7 @@ namespace GiftStore.API
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { Status = false, message = "Error loading Excel file: " + ex.Message, StatusCode = 500 });
+                return StatusCode(500, new { Status = true, message = "Error loading Excel file: " + ex.Message, StatusCode = 500 });
             }
 
             IXLWorksheet worksheet = workbook.Worksheets.First();
@@ -630,7 +629,7 @@ namespace GiftStore.API
 
             if (row == null)
             {
-                return Ok(new { Status = false, message = "Label not found in the Excel file.", StatusCode = 404 });
+                return Ok(new { Status = true, message = "Label not found in the Excel file.", StatusCode = 404 });
             }
 
             var giftCardInfo = new
@@ -650,7 +649,7 @@ namespace GiftStore.API
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { Status = false, message = "Error decrypting the code: " + ex.Message, StatusCode = 500 });
+                return StatusCode(500, new { Status = true, message = "Error decrypting the code: " + ex.Message, StatusCode = 500 });
             }
             var selectedgiftcard = db.giftCards.Where(x => x.label ==label).FirstOrDefault();
 
@@ -681,10 +680,7 @@ namespace GiftStore.API
         public IActionResult GetAllGiftCards()
         {
             List<GiftCards> allgiftcards = db.giftCards.ToList();
-            if (allgiftcards.Count <= 0)
-            {
-                return Ok(new { Status = false, message = "No giftcard found", allgiftcards });
-            }
+           
             return Ok(new { Status = true, allgiftcards });
         }
 
@@ -703,10 +699,7 @@ namespace GiftStore.API
                 query = query.Where(u => u.type == type);
 
             var giftcards = query.ToList();
-            if (!giftcards.Any())
-            {
-                return Ok(new { Status = false, message = "گیفت کارتی با چنین وضعیتی وجود ندارد", giftcards });
-            }
+           
             return Ok(new { Status = true, giftcards });
         }
 
@@ -715,15 +708,22 @@ namespace GiftStore.API
         {
             var Gc = db.giftCards.FirstOrDefault(u => u.label == label);
             if (Gc == null)
-                return Ok(new { Status = false, message = "گیفت کارت پیدا نشد", Gc });
+                return BadRequest(new { Status = false, message = "گیفت کارت پیدا نشد", Gc });
 
             if (DeleteRow(label))
             {
                 db.giftCards.Remove(Gc);
-                db.SaveChanges();
+                if (db.SaveChanges() == 1)
+                   // return Ok(new { Status = true, newlog, message = "امتیازات این کاربر اضافه شد" });
                 return Ok(new { Status = true, message = "گیفت کارت با موفقیت حذف شد" });
+
+                else
+                    return BadRequest(new { Status = false, message = "Failed " });
+
+
+
             }
-            return Ok(new { Status = false, message = "خطا در حذف گیفت کارت" });
+            return BadRequest(new { Status = false, message = "خطا در حذف گیفت کارت" });
         }
 
         private bool DeleteRow(string label)
@@ -766,7 +766,7 @@ namespace GiftStore.API
             var giftcard = db.giftCards.FirstOrDefault(u => u.label == label);
             if (giftcard == null)
             {
-                return Ok(new { Status = false, message = "گیفت کارتی با این لیبل یافت نشد", giftcard });
+                return BadRequest(new { Status = false, message = "گیفت کارتی با این لیبل یافت نشد", giftcard });
             }
 
             InfoSec en = new InfoSec();
@@ -781,12 +781,20 @@ namespace GiftStore.API
             giftcard.ExpDate = model.ExpDate;
             giftcard.Status = model.status;
 
-            db.SaveChanges();
+            if (db.SaveChanges() == 1) {
+                string directory = @"wwwroot/GiftCards/GiftCards.xlsx";
+                UpdateExcel(label, encryptedCode, newKey, IVkey, directory);
+                return Ok(new { Status = true, message = "اطلاعات با موفقیت بروزرسانی شد", StatusCode = 200 });
+              
+            }
+              
+            else
+                return BadRequest(new { Status = false, message = "Failed " });
 
-            string directory = @"wwwroot/GiftCards/GiftCards.xlsx";
-            UpdateExcel(label, encryptedCode, newKey, IVkey, directory);
 
-            return Ok(new { Status = true, message = "اطلاعات با موفقیت بروزرسانی شد", StatusCode = 200 });
+
+          
+
         }
 
         private void UpdateExcel(string label, string encryptedCode, string key, string ivKey, string directory)
@@ -828,10 +836,7 @@ namespace GiftStore.API
         public IActionResult SoldGiftsCount()
         {
             var soldgiftcards = db.giftCards.Where(u => u.Status == "فروخته شده").ToList().Count();
-            if (soldgiftcards<= 0)
-            {
-                return Ok(new { Status = false, soldgiftcards});
-            }
+         
             return Ok(new { Status = true, soldgiftcards });
         }
 
@@ -863,22 +868,45 @@ namespace GiftStore.API
         [HttpGet("/ShowUserTickets")]
         public IActionResult ShowUserTickets([FromQuery] int id)
         {
+
             var tickets = db.tickets.Where(t => t.UserId == id).ToList();
-            if (!tickets.Any())
-            {
-                return Ok(new { Status = false,tickets, message = "درخواستی از طرف این کاربر وجود ندارد", StatusCode = 200 });
-            }
+           
             return Ok(new { Status = true, tickets });
         }
         [HttpGet("/ShowUserTicketChats")]
         public IActionResult ShowUserTicketChats([FromQuery] int id)
         {
-            var chat = db.ticketChats.Where(t => t.TicketId == id).ToList();
-            if (!chat.Any())
+            // Retrieve chats with only the required fields
+            var chats = db.ticketChats
+                .Where(t => t.TicketId == id)
+                .Select(t => new
+                {
+                    Message = t.message,
+                    Sender = t.Sender,
+                    SendDate = t.SendDate
+                })
+                .ToList();
+
+            // Retrieve the ticket status
+            var ticketStatus = db.tickets
+                .Where(t => t.Id == id)
+                .Select(t => t.Status)
+                .FirstOrDefault(); // Use FirstOrDefault to get a single value
+
+            // Retrieve the user associated with the ticket
+            var user = db.tickets
+                .Where(t => t.Id == id)
+                .Select(t => t.user) // Assuming `user` is a navigation property in the `Tickets` model
+                .FirstOrDefault(); // Use FirstOrDefault to get a single user object
+
+            // Return the response in the desired format
+            return Ok(new
             {
-                return Ok(new { Status = false,chat, message = "درخواستی از طرف این کاربر وجود ندارد", StatusCode = 200 });
-            }
-            return Ok(new { Status = true, chat });
+                Status = true,
+                User = user,
+                TicketStatus = ticketStatus,
+                Chats = chats
+            });
         }
         [HttpGet("/GetImage")]
         public IActionResult GetImage([FromQuery] int id)
@@ -886,23 +914,20 @@ namespace GiftStore.API
             var user = db.tickets.FirstOrDefault(t => t.Id == id);
             if (user == null)
             {
-                return Ok(new { Status = false,user, message = "چنین کاربری موجود نمیباشد", StatusCode = 200 });
+                return Ok(new { Status = true,user, message = "چنین تیکتی موجود نمیباشد", StatusCode = 200 });
             }
 
             string filePath = db.tickets.FirstOrDefault(x => x.Id == id).DocumentPath;
             if (filePath == null)
             {
-                return Ok(new { Status = false,filePath, message = "فایلی موجود نمیباشد", StatusCode = 200 });
+                return Ok(new { Status = true,filePath, message = "فایلی موجود نمیباشد", StatusCode = 200 });
             }
 
-            if (!System.IO.File.Exists(filePath))
-            {
-                return Ok(new { Status = false, message = "File not found or path is invalid." });
-            }
+            
 
-            string contentType = GetContentType(filePath);
-            var fileStream = System.IO.File.OpenRead(filePath);
-            return File(fileStream, contentType);
+          //string contentType = GetContentType(filePath);
+            //var fileStream = System.IO.File.OpenRead(filePath);
+            return Ok(new {File=filePath});
         }
 
         private string GetContentType(string filePath)
@@ -925,10 +950,7 @@ namespace GiftStore.API
         public IActionResult GetAllTickets()
         {
             var tickets = db.tickets.ToList();
-            if (!tickets.Any())
-            {
-                return BadRequest(new { Status = false, message = "درخواستی از طرف این کاربر وجود ندارد", StatusCode = 200 });
-            }
+           
             return Ok(new { Status = true, tickets });
         }
 
@@ -936,10 +958,7 @@ namespace GiftStore.API
         public IActionResult GetAllTicketsByImportance()
         {
             var tickets = db.tickets.OrderByDescending(t => t.Importance).ToList();
-            if (!tickets.Any())
-            {
-                return BadRequest(new { Status = false, message = "درخواستی از طرف این کاربر وجود ندارد", StatusCode = 200 });
-            }
+          
             return Ok(new { Status = true, tickets });
         }
 
@@ -947,30 +966,58 @@ namespace GiftStore.API
         public IActionResult GetAllTicketsByStatus([FromQuery] string status)
         {
             var tickets = db.tickets.Where(t => t.Status == status).ToList();
-            if (!tickets.Any())
-            {
-                return BadRequest(new { Status = false, message = "درخواستی از طرف این کاربر وجود ندارد", StatusCode = 200 });
-            }
+          
             return Ok(new { Status = true, tickets });
         }
 
+        [HttpGet("/GetAllTicketsByTile")]
+        public IActionResult GetAllTicketsByTile([FromQuery] string? status)
+        {
+
+
+            if (string.IsNullOrEmpty(status))
+            {
+                var all = db.tickets.ToList();
+                return Ok(new { Status = true, all });
+
+            }
+
+            var tickets = db.tickets.Where(t => t.Title .Contains( status)).ToList();
+
+            return Ok(new { Status = true, tickets });
+        }
         [HttpPost("/SendResponeToTickets")]
         public IActionResult SendResponeToTickets([FromQuery] int id, [FromBody] ViewModelResponseToTickets model )
         {
+            
             var chat = db.tickets.FirstOrDefault(u => u.Id == id);
-            if (chat == null)
+            if(chat.Status!="بسته شده")
             {
-                return BadRequest(new { Status = false,chat, message = "تیکتی یافت نشد", StatusCode = 200 });
-            }
-            TicketChats newRes= new TicketChats();
+                if (chat == null)
+                {
+                    return BadRequest(new { Status = false, chat, message = "تیکتی یافت نشد", StatusCode = 200 });
+                }
+                TicketChats newRes = new TicketChats();
 
-            newRes.Sender = 1;
-            newRes.SendDate = DateTime.Now;
-            newRes.message=model.Response;
-            newRes.TicketId = id;
-            db.ticketChats.Add(newRes);
-            db.SaveChanges();
-            return Ok(new { Status = true, message = "تیکت با موفقیت پاسخ داده شد", chat });
+                newRes.Sender = 1;
+                newRes.SendDate = DateTime.Now;
+                newRes.message = model.Response;
+                newRes.TicketId = id;
+                db.ticketChats.Add(newRes);
+                if (db.SaveChanges() == 1)
+                    return Ok(new { Status = true, message = "تیکت با موفقیت پاسخ داده شد", chat });
+
+                else
+                    return BadRequest(new { Status = false, message = "Failed " });
+
+
+
+            }
+            else
+            {
+                return Ok(new { Status = false, message = "این چت بسته شده" });
+            }
+
         }
 
         [HttpPost("/CloseTicket")]
@@ -983,8 +1030,13 @@ namespace GiftStore.API
             }
 
             ticket.Status = "بسته شده";
-            db.SaveChanges();
-            return Ok(new { Status = true, message = "تیکت با موفقیت پاسخ داده شد", ticket });
+            if (db.SaveChanges() == 1)
+                return Ok(new { Status = true, message = "تیکت با موفقیت پاسخ داده شد", ticket });
+            else
+                return BadRequest(new { Status = false, message = "Failed " });
+
+
+           
         }
 
 
@@ -1003,16 +1055,33 @@ namespace GiftStore.API
                 };
 
                 db.telegramStars.Add(model);
-                db.SaveChanges();
-                return Ok(new { Status = true, model });
+                if (db.SaveChanges() == 1)
+                    return Ok(new { Status = true, model});
+
+                else
+                    return BadRequest(new { Status = false, message = "Failed " });
+
 
             }
             else
             {
-                return Ok(new { Status = false,message="ستاره نمیتواند کمتر از صفر باشد" });
+                return BadRequest(new { Status = false,message="ستاره نمیتواند کمتر از صفر باشد" });
 
 
             }
+
+
+        }
+        [HttpPost("/GetMinStars")]
+        public IActionResult GetMinStars()
+        {
+
+            var lastRow = db.telegramStars
+.OrderByDescending(t => t.Id) // Sort by Id in descending order
+.FirstOrDefault(); // Get the first row (which has the highest Id)
+            var minStars = lastRow.MinStars;
+
+           return Ok(new { minStars, Status = true });
 
 
         }
@@ -1029,21 +1098,31 @@ namespace GiftStore.API
                 };
 
                 db.telegramStars.Add(model);
-                db.SaveChanges();
-                return Ok(new { Status = true, model });
+                if (db.SaveChanges() == 1)
+                    return Ok(new { Status = true, model});
 
+                else
+                    return BadRequest(new { Status = false, message = "Failed " });
             }
             else
             {
-                return Ok(new { Status = false, message = "ستاره نمیتواند کمتر از صفر باشد" });
-
-
+                return BadRequest(new { Status = false, message = "ستاره نمیتواند کمتر از صفر باشد" });
             }
+        }
+
+        [HttpPost("/GetStarsPerDollar")]
+        public IActionResult GetStarsPerDollar()
+        {
+
+            var lastRow = db.telegramStars
+.OrderByDescending(t => t.Id) // Sort by Id in descending order
+.FirstOrDefault(); // Get the first row (which has the highest Id)
+            var minStars = lastRow.StarsPerADollar;
+
+            return Ok(new {  minStars, Status = true });
 
 
         }
-
-
         [HttpPost("/removeStars")]
         public IActionResult removeStars([FromQuery] int id)
         {
@@ -1051,7 +1130,7 @@ namespace GiftStore.API
         var UserRequest=db.userStarsLogs.Where(x=>x.UserId == id).FirstOrDefault();
             if (UserRequest == null)
             {
-                return BadRequest(new { Status = false, message = "درخاستی از طرف این کاربر یافت نشد" });
+                return Ok(new { Status = false, message = "درخاستی از طرف این کاربر یافت نشد" });
             }
             else
             {
@@ -1063,20 +1142,70 @@ namespace GiftStore.API
                 if (UserRequest.Status == "Waiting")
                 {
                     var user = db.users.FirstOrDefault(x => x.Id == id);
-                    user.Stars = -minStars;
+                    user.Stars = 0;
                     UserRequest.Status = "success";
-                    db.SaveChanges();
-                    return Ok(new { Status = true, message = "امتیازات این کاربر صفر شد" });
+                    if (db.SaveChanges() == 1)
+                        return Ok(new { Status = true, user});
+
+                    else
+                        return BadRequest(new { Status = false, message = "Failed " });
+
+
                 }
                 else
                 {
-                    return Ok(new { Status = false, message = "به این درخاست قبلا رسیدگی شده است" });
+                    return BadRequest(new { Status = false, message = "به این درخاست قبلا رسیدگی شده است" });
 
                 }
             }
         
         }
+        [HttpPost("/DeleteStars")]
+        public IActionResult DeleteStars([FromQuery] int id, [FromQuery] int stars)
+        {
 
+
+
+            var user = db.users.FirstOrDefault(x => x.Id == id);
+            if (user != null)
+            {
+                user.Stars = user.Stars - stars;
+
+                db.SaveChanges();
+
+                var newlog = new UserStarsLog();
+
+
+                newlog.Star = stars;
+                newlog.Type = "out";
+                newlog.Status = "success";
+                newlog.LogDate = DateTime.Now;
+                newlog.UserId = id;
+
+
+
+
+
+                db.userStarsLogs.Add(newlog);
+
+                if (db.SaveChanges() == 1)
+                    return Ok(new { Status = true, user, message = "امتیازات این کاربر کم شد شد" });
+
+                else
+                    return BadRequest(new { Status = false, message = "Failed " });
+
+
+            }
+
+
+
+            else
+            {
+                return BadRequest(new { Status = false, message = "کاربر یافت نشد" });
+
+            }
+
+        }
         [HttpPost("/AddStars")]
         public IActionResult AddStars([FromQuery] int id, [FromQuery] int addstars)
         {
@@ -1086,7 +1215,7 @@ namespace GiftStore.API
             var user = db.users.FirstOrDefault(x => x.Id == id);
             if (user != null)
             {
-                user.Stars = addstars;
+                user.Stars = user.Stars+ addstars;
                 db.SaveChanges();
 
                 var newlog = new UserStarsLog();
@@ -1103,9 +1232,13 @@ namespace GiftStore.API
 
 
                 db.userStarsLogs.Add(newlog);
-                db.SaveChanges();
+                
+                if (db.SaveChanges() == 1)
+                    return Ok(new { Status = true, user, message = "امتیازات این کاربر اضافه شد" });
 
-                return Ok(new { Status = true, message = "امتیازات این کاربر اضافه شد" });
+                else
+                    return BadRequest(new { Status = false, message = "Failed " });
+
 
             }
 
@@ -1128,48 +1261,57 @@ namespace GiftStore.API
         public IActionResult GetAllFactors()
         {
             var factors = db.factors
-                .Include(f => f.GiftCard) // Include the GiftCard navigation property
-                .Select(f => new
-                {
-                    // Fields from the Factors table
-                    FactorId = f.Id,
-                    UserId = f.UserId,
-                    FactorDate = f.FactorDate,
-                    GiftId = f.GiftId,
-                    Status = f.Status,
-                    Type = f.Type,
-                    TransActionNumber = f.TransActionNumber,
-                    FactorPrice = f.FactorPrice,
-                    // Price from the GiftCards table
-                     // Handle null GiftCard
-                })
-                .ToList();
+                  .Include(f => f.GiftCard) // Include the GiftCard navigation property
+                  .Include(f => f.User) // Include the User navigation property
+                   // Filter factors with Status == true
+                  .Select(f => new
+                  {
+                      // Fields from the Factors table
+                      FactorId = f.Id,
+                      UserId = f.UserId,
+                      FactorDate = f.FactorDate,
+                      GiftId = f.GiftId,
+                      Status = f.Status,
+                      Type = f.Type,
+                      TransActionNumber = f.TransActionNumber,
+                      factorPrice = f.GiftCard.Price,
+                      // Combine FirstName and LastName from the User navigation property
+                      Username = f.User != null ? $"{f.User.FirstName} {f.User.LastName}" : "Unknown User",
+                      // Price from the GiftCards table (handle null GiftCard)
+                      GiftCardPrice = f.GiftCard != null ? f.GiftCard.Price : (double?)null
+                  })
+                  .ToList();
 
-            return Ok(factors); // Return the list of factors
+            return Ok(new { factors, Status = true }); // Return the filtered list of factors
+                                                       // Return the list of factors
         }
         [HttpGet("/GetAllFactorsFail")]
         public IActionResult GetAllFactorsFail()
         {
             var factors = db.factors
-                .Include(f => f.GiftCard) // Include the GiftCard navigation property
-                .Where(f => f.Status == false) // Filter factors with Status == false
-                .Select(f => new
-                {
-                    // Fields from the Factors table
-                    FactorId = f.Id,
-                    UserId = f.UserId,
-                    FactorDate = f.FactorDate,
-                    GiftId = f.GiftId,
-                    Status = f.Status,
-                    Type = f.Type,
-                    TransActionNumber = f.TransActionNumber,
-                    FactorPrice = f.FactorPrice,
-                    // Price from the GiftCards table (handle null GiftCard)
-                    GiftCardPrice = f.GiftCard != null ? f.GiftCard.Price : (double?)null
-                })
-                .ToList();
+                    .Include(f => f.GiftCard) // Include the GiftCard navigation property
+                    .Include(f => f.User) // Include the User navigation property
+                    .Where(f => f.Status == true) // Filter factors with Status == true
+                    .Select(f => new
+                    {
+                        // Fields from the Factors table
+                        FactorId = f.Id,
+                        UserId = f.UserId,
+                        FactorDate = f.FactorDate,
+                        GiftId = f.GiftId,
+                        Status = f.Status,
+                        Type = f.Type,
+                        TransActionNumber = f.TransActionNumber,
+                        factorPrice = f.GiftCard.Price,
+                        // Combine FirstName and LastName from the User navigation property
+                        Username = f.User != null ? $"{f.User.FirstName} {f.User.LastName}" : "Unknown User",
+                        // Price from the GiftCards table (handle null GiftCard)
+                        GiftCardPrice = f.GiftCard != null ? f.GiftCard.Price : (double?)null
+                    })
+                    .ToList();
 
-            return Ok(factors); // Return the filtered list of factors
+            return Ok(new { factors, Status = true }); // Return the filtered list of factors
+                                                       // Return the filtered list of factors
         }
 
 
@@ -1180,7 +1322,8 @@ namespace GiftStore.API
         {
             var factors = db.factors
                 .Include(f => f.GiftCard) // Include the GiftCard navigation property
-                .Where(f => f.Status == true) // Filter factors with Status == false
+                .Include(f => f.User) // Include the User navigation property
+                .Where(f => f.Status == true) // Filter factors with Status == true
                 .Select(f => new
                 {
                     // Fields from the Factors table
@@ -1191,14 +1334,129 @@ namespace GiftStore.API
                     Status = f.Status,
                     Type = f.Type,
                     TransActionNumber = f.TransActionNumber,
-                    FactorPrice = f.FactorPrice,
+                    factorPrice = f.GiftCard.Price,
+                    // Combine FirstName and LastName from the User navigation property
+                    Username = f.User != null ? $"{f.User.FirstName} {f.User.LastName}" : "Unknown User",
                     // Price from the GiftCards table (handle null GiftCard)
                     GiftCardPrice = f.GiftCard != null ? f.GiftCard.Price : (double?)null
                 })
                 .ToList();
 
-            return Ok(factors); // Return the filtered list of factors
+            return Ok(new { factors, Status = true }); // Return the filtered list of factors
         }
+
+
+        [HttpGet("/SearchInAllFactorsByName")]
+        public IActionResult SearchInAllFactorsByName([FromQuery]string? name )
+        {
+            if (string.IsNullOrEmpty(name))
+            {
+                var factors1 = db.factors
+            .Include(f => f.GiftCard) // Include the GiftCard navigation property
+            .Include(f => f.User) // Include the User navigation property
+             // Filter factors with Status == true
+            .Select(f => new
+            {
+                // Fields from the Factors table
+                FactorId = f.Id,
+                UserId = f.UserId,
+                FactorDate = f.FactorDate,
+                GiftId = f.GiftId,
+                Status = f.Status,
+                Type = f.Type,
+                TransActionNumber = f.TransActionNumber,
+                factorPrice = f.GiftCard.Price,
+                // Combine FirstName and LastName from the User navigation property
+                Username = f.User != null ? $"{f.User.FirstName} {f.User.LastName}" : "Unknown User",
+                // Price from the GiftCards table (handle null GiftCard)
+                GiftCardPrice = f.GiftCard != null ? f.GiftCard.Price : (double?)null
+            })
+            .ToList();
+                return Ok(new { factors1, Status = true }); // Return the filtered list of factors
+
+            }
+            var factors = db.factors
+                .Include(f => f.GiftCard) // Include the GiftCard navigation property
+                .Include(f => f.User) // Include the User navigation property
+                .Where(f => f.UserName.Contains( name )) // Filter factors with Status == true
+                .Select(f => new
+                {
+                    // Fields from the Factors table
+                    FactorId = f.Id,
+                    UserId = f.UserId,
+                    FactorDate = f.FactorDate,
+                    GiftId = f.GiftId,
+                    Status = f.Status,
+                    Type = f.Type,
+                    TransActionNumber = f.TransActionNumber,
+                    factorPrice = f.GiftCard.Price,
+                    // Combine FirstName and LastName from the User navigation property
+                    Username = f.User != null ? $"{f.User.FirstName} {f.User.LastName}" : "Unknown User",
+                    // Price from the GiftCards table (handle null GiftCard)
+                    GiftCardPrice = f.GiftCard != null ? f.GiftCard.Price : (double?)null
+                })
+                .ToList();
+
+            return Ok(new { factors, Status = true }); // Return the filtered list of factors
+        }
+        [HttpGet("/SearchInFailFactorsByName")]
+        public IActionResult SearchInFailFactorsByName([FromQuery] string? name, [FromQuery] bool status)
+        {
+            
+            if (string.IsNullOrEmpty(name))
+            {
+               var  factorsfull = db.factors
+            .Include(f => f.GiftCard) // Include the GiftCard navigation property
+            .Include(f => f.User). // Include the User navigation property
+                        Where(c=>c.Status==status)          // Filter factors with Status == true
+            .Select(f => new
+            {
+                // Fields from the Factors table
+                FactorId = f.Id,
+                UserId = f.UserId,
+                FactorDate = f.FactorDate,
+                GiftId = f.GiftId,
+                Status = f.Status,
+                Type = f.Type,
+                TransActionNumber = f.TransActionNumber,
+                factorPrice = f.GiftCard.Price,
+                // Combine FirstName and LastName from the User navigation property
+                Username = f.User != null ? $"{f.User.FirstName} {f.User.LastName}" : "Unknown User",
+                // Price from the GiftCards table (handle null GiftCard)
+                GiftCardPrice = f.GiftCard != null ? f.GiftCard.Price : (double?)null
+            })
+            .ToList();
+                return Ok(new { factorsfull, Status = true }); // Return the filtered list of factors
+
+            }
+
+            var factors = db.factors
+                .Include(f => f.GiftCard) // Include the GiftCard navigation property
+                .Include(f => f.User) // Include the User navigation property
+                .Where(f => f.UserName.Contains(name)&&f.Status==status) // Filter factors with Status == true
+                .Select(f => new
+                {
+                    // Fields from the Factors table
+                    FactorId = f.Id,
+                    UserId = f.UserId,
+                    FactorDate = f.FactorDate,
+                    GiftId = f.GiftId,
+                    Status = f.Status,
+                    Type = f.Type,
+                    TransActionNumber = f.TransActionNumber,
+                    factorPrice = f.GiftCard.Price,
+                    // Combine FirstName and LastName from the User navigation property
+                    Username = f.User != null ? $"{f.User.FirstName} {f.User.LastName}" : "Unknown User",
+                    // Price from the GiftCards table (handle null GiftCard)
+                    GiftCardPrice = f.GiftCard != null ? f.GiftCard.Price : (double?)null
+                })
+                .ToList();
+
+            return Ok(new { factors, Status = true }); // Return the filtered list of factors
+        }
+
+
+
         [HttpGet("sum-payments")]
         public IActionResult SumPayments()
         {
@@ -1277,5 +1535,48 @@ namespace GiftStore.API
                 GiftCardTypePercentages = giftCardTypeIncome
             });
         }
+        [HttpGet("/GetActivitylogs")]
+        public IActionResult GetActivitylogs()
+        {
+
+            var logs=db.activityLogs.ToList();
+            return Ok(new {Status=true,Logs=logs});
+
+        }
+
+        [HttpPost("/AddActivitylogs")]
+        public IActionResult AddActivitylogs([FromBody] AddActivityLogViewModel model)
+        {
+            var newlog = new ActivityLog
+            {
+                UserId = model.UserId,
+                Description = model.Description,
+                LogDate = DateTime.Now,
+                UserRole = db.users.Where(x => x.Id == model.UserId).Select(x => x.Role).FirstOrDefault(),
+                Name= db.users.Where(x => x.Id == model.UserId).Select(x => x.LastName).FirstOrDefault()+ db.users.Where(x => x.Id == model.UserId).Select(x => x.LastName).FirstOrDefault()
+            };
+            db.activityLogs.Add(newlog);
+            if (db.SaveChanges() == 1)
+            {
+                return Ok(new {Status=true,newlog});
+            }
+            else
+            {
+                return BadRequest(new {Status=false,newlog});
+            }
+
+
+        }
+
+
+        [HttpGet("/GetActivitylogsEnterExit")]
+        public IActionResult GetActivitylogsEnterExit()
+        {
+
+            var logs = db.activityLogs.Where(x=>x.Description=="ورود"||x.Description=="خروج").ToList();
+            return Ok(new { Status = true, Logs = logs });
+
+        }
+
     }
 }

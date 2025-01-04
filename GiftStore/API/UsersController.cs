@@ -1,5 +1,6 @@
 ﻿using GiftStore.Data;
 using GiftStore.Models;
+using GiftStore.Services;
 using GiftStore.ViewModels;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -18,7 +19,7 @@ namespace GiftStore.API
         }
 
         /// <summary>
-        /// Create a new ticket
+        ///tickets
         /// </summary>
         [HttpPost("/CreateTicket")]
         public IActionResult CreateTicket(AddTicketViewModel model)
@@ -99,45 +100,40 @@ namespace GiftStore.API
             var image = db.tickets.FirstOrDefault(t => t.Id == id);
             if (image == null)
             {
-                return Ok(new { Status = false, message = "چنین کاربری موجود نمیباشد", image });
+                return Ok(new { Status = true, image, message = "چنین تیکتی موجود نمیباشد" });
             }
 
             string filePath = db.tickets.FirstOrDefault(x => x.Id == id).DocumentPath;
             if (filePath == null)
             {
-                return BadRequest(new { Status = false, message = "فایلی موجود نمیباشد", StatusCode = 200 });
+                return Ok(new { Status = true, filePath, message = "فایلی موجود نمیباشد", StatusCode = 200 });
             }
 
-           
-           // string contentType = documentsService.GetContentType(filePath);
-            //var fileStream = System.IO.File.OpenRead(filePath);
-            return Ok(new {File= filePath });
-        }
+            // Remove the "wwwroot" prefix and replace backslashes with forward slashes
+            string correctedFilePath = filePath
+                .Replace("wwwroot\\", "") // Remove "wwwroot\"
+                .Replace("\\", "/");      // Replace backslashes with forward slashes
 
+            return Ok(new { File = "https://gifteto.net/" + correctedFilePath });
+        }
         /// <summary>
         /// Determine the content type of a file
         /// </summary>
-       
+
 
         /// <summary>
         /// Get all tickets for a specific user
         /// </summary>
+        /// 
+
         [HttpGet("/get-GetAllTickets")]
         public IActionResult GetAllTickets([FromQuery] int id)
         {
-            var user = db.users.FirstOrDefault(x => x.Id == id);
-            if (user == null)
-            {
-                return BadRequest(new { Status = false, message = "چنین کاربری موجود نمیباشد", StatusCode = 200 });
-            }
+            var tickets = db.tickets.Where(x => x.UserId == id);
 
-            var tickets = db.tickets.Where(x => x.UserId == id).ToList();
-            if (tickets.Count <= 0)
-            {
-                return Ok(new { Status = true, message = "درخواستی از طرف این کاربر وجود ندارد", StatusCode = 200 });
-            }
+            return Ok(new { Status = true, tickets });
 
-            return Ok(new { Status = true, tickets, StatusCode = 200 });
+
         }
         [HttpGet("/get-GetAllTicketChats")]
         public IActionResult GetAllTicketChats([FromQuery] int id)
@@ -176,7 +172,7 @@ namespace GiftStore.API
             // Check if the file exists
             if (!System.IO.File.Exists(filePath))
             {
-                return Ok(new { Status = false, message = "File not found or path is invalid." });
+                return BadRequest(new { Status = false, message = "File not found or path is invalid." });
             }
 
             try
@@ -192,18 +188,54 @@ namespace GiftStore.API
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { Status = false, message = "خطا در حذف فایل: " + ex.Message, StatusCode = 500 });
+                return StatusCode(500, new { Status = true, message = "خطا در حذف فایل: " + ex.Message, StatusCode = 500 });
             }
         }
 
+        [HttpPost("/SendMessageToTickets")]
+        public IActionResult SendMessageToTickets([FromQuery] int id, [FromBody] ViewModelResponseToTickets model)
+        {
+            var chat = db.tickets.FirstOrDefault(u => u.Id == id);
 
+
+            if (chat == null)
+            {
+                return BadRequest(new { Status = false, chat, message = "تیکتی یافت نشد", StatusCode = 200 });
+            }
+            if (chat.Status != "بسته شده")
+            {
+                TicketChats newRes = new TicketChats();
+
+                newRes.Sender = 0;
+                newRes.SendDate = DateTime.Now;
+                newRes.message = model.Response;
+                newRes.TicketId = id;
+                db.ticketChats.Add(newRes);
+                if (db.SaveChanges() == 1)
+                    return Ok(new { Status = true, chat });
+
+                else
+                    return BadRequest(new { Status = false, message = "Failed " });
+
+
+            }
+            else
+            {
+                return BadRequest(new { Status = false, message = "چت بسته شده است" });
+            }
+        }
+/// <summary>
+/// ////داشبورد
+/// </summary>
+/// <param name="id"></param>
+/// <returns></returns>
         [HttpGet("/GetDashbordInformatons")]
         public IActionResult GetDashbordInformatons([FromQuery] int id)
         {
             var user = db.users.FirstOrDefault(x => x.Id == id);
             if (user == null)
             {
-                return BadRequest(new { Status = false, message = "چنین کاربری موجود نمیباشد", StatusCode = 200 });
+                return Ok(new { Status = true, message = "چنین کاربری موجود نمیباشد", StatusCode = 200 });
             }
 
             var wallet = user.wallet;
@@ -212,7 +244,11 @@ namespace GiftStore.API
           
             return Ok(new { Status = true, wallet,giftcardcount,stars});
         }
-
+        /// <summary>
+        /// /score
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns></returns>
         [HttpGet("/GetUserStars")]
         public IActionResult GetUserStars([FromQuery] int id)
         {
@@ -224,7 +260,23 @@ namespace GiftStore.API
             }
             else
             {
-                return Ok(new { Status = false});
+                return Ok(new { Status = true});
+
+
+            }
+        }
+        [HttpGet("/GetUserStarsLog")]
+        public IActionResult GetUserStarsLog([FromQuery] int id)
+        {
+            var  logss= db.userStarsLogs.Where(x => x.UserId == id);
+            if (logss.Any())
+            {
+                return Ok(new { Status = true, logss });
+
+            }
+            else
+            {
+                return Ok(new { Status = true,logss });
 
 
             }
@@ -271,9 +323,202 @@ namespace GiftStore.API
             else
             {
 
-                return Ok(new {Status=false,message="تعداد ستاره های شماره کمتراز حد مجاز است",MinStarNeed=minStars});
+                return BadRequest(new {Status=false,message="تعداد ستاره های شماره کمتراز حد مجاز است",MinStarNeed=minStars});
 
             }
+
+        }
+
+        /// <summary>
+        /// wallet
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns></returns>
+        /// 
+
+
+
+
+
+        [HttpGet("/GetUserWallet")]
+        public IActionResult GetUserWallet([FromQuery] int id)
+        {
+            var dollar = db.users.Where(x => x.Id == id).Select(x=>x.wallet).FirstOrDefault();
+           
+                return Ok(new { Status = true, dollar });
+
+             
+        }
+
+
+        [HttpGet("/GetUserWalletlog")]
+        public IActionResult GetUserWalletlog([FromQuery] int id)
+        {
+            var logss = db.walletLogs.Where(x => x.UserId == id).ToList();
+
+            return Ok(new { Status = true, logss });
+
+
+        }
+
+        /////
+    
+/// <summary>
+/// orders
+/// </summary>
+/// <param name="id"></param>
+/// <returns></returns>
+        [HttpGet("/GetUserFactors")]
+        public IActionResult GetUserFactors([FromQuery] int id)
+        {
+            var factors = db.factors.Where(x => x.UserId == id);
+            if (factors.Any())
+            {
+                return Ok(new { Status = true, factors });
+
+            }
+            else
+            {
+                return Ok(new { Status = true, factors });
+
+
+            }
+        }
+
+
+        [HttpGet("/GetGiftCard/{id}")]
+        public IActionResult GetGiftCard(int id)
+        {
+            try
+            {
+                string directory = @"wwwroot/GiftCards/GiftCards.xlsx";
+                string filePath = Path.Combine(directory, "GiftCards.xlsx");
+
+                // Check if the file exists
+                if (!System.IO.File.Exists(filePath))
+                {
+                    return NotFound(new { Status = false, Message = "Excel file not found." });
+                }
+
+                // Open the Excel file
+                using (var workbook = new ClosedXML.Excel.XLWorkbook(filePath))
+                {
+                    var worksheet = workbook.Worksheet(1); // Assuming the data is in the first sheet
+
+                    // Skip the header row (if it exists) and find the row with the matching ID
+                    var row = worksheet.RowsUsed().Skip(1) // Skip the header row
+                                                  .FirstOrDefault(r =>
+                                                  {
+                                                      var cellValue = r.Cell(1).GetValue<string>();
+                                                      return int.TryParse(cellValue, out int rowId) && rowId == id;
+                                                  });
+
+                    if (row == null)
+                    {
+                        return NotFound(new { Status = false, Message = "Gift card not found." });
+                    }
+
+                    // Extract data from the row
+                    string label = row.Cell(2).GetValue<string>();
+                    string encryptedResult = row.Cell(3).GetValue<string>();
+                    string key = row.Cell(4).GetValue<string>();
+                    string ivKey = row.Cell(5).GetValue<string>();
+
+                    // Decrypt the data
+                    InfoSec en = new InfoSec();
+                    string decryptedResult = en.Decrypt(encryptedResult, key, ivKey);
+
+                    // Return the decrypted data
+                    return Ok(new
+                    {
+                        Status = true,
+                        Label = label,
+                        DecryptedResult = decryptedResult,                    
+                        Message = "Gift card retrieved successfully."
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Status = false, Message = $"An error occurred: {ex.Message}" });
+            }
+        }
+
+
+
+        ////profile
+        ///
+        [HttpGet("/GetUserActivityLogs")]
+        public IActionResult GetUserActivityLogs([FromQuery] int id)
+        {
+            var activitylogs = db.activityLogs.Where(x => x.UserId == id && x.Description=="ورود" || x.Description == "خروج").ToList();
+
+            return Ok(new { Status = true, activitylogs });
+
+
+        }
+        [HttpGet("/GetUserInfos")]
+        public IActionResult GetUserInfos([FromQuery] int id)
+        {
+            var userinfos = db.users.Where(x => x.Id == id );
+
+            return Ok(new { Status = true, userinfos });
+
+
+        }
+
+        /// <summary>
+        /// //
+        /// </summary>
+        /// <param name="mdoel"></param>
+        /// <param name="id"></param>
+        /// <returns></returns>
+        [HttpPost("/UpdateUserInfos")]
+        public IActionResult UpdateUserInfos([FromBody] UpdateUserProfileViewModel mdoel,[FromQuery]int id )
+        {
+            var userinfos = db.users.FirstOrDefault(x => x.Id == id);
+            userinfos.FirstName=mdoel.FirstName;
+            userinfos.LastName=mdoel.LastName;
+            userinfos.Phone=mdoel.Phone;
+            userinfos.Email=mdoel.Email;
+            if (db.SaveChanges() == 1)
+            {
+                return Ok(new { Status = true, userinfos });
+
+            }
+            else
+            {
+                return BadRequest(new { Status = false, userinfos });
+
+            }
+
+        }
+        [HttpPost("/UpdateUserPass")]
+        public IActionResult UpdateUserPass(string oldpass,string newpas ,[FromQuery] int id)
+        {
+            var userinfos = db.users.FirstOrDefault(x => x.Id == id);
+            if(userinfos.Password == oldpass)
+            {
+                    userinfos.Password = newpas;
+                if (db.SaveChanges() == 1)
+                {
+                    return Ok(new { Status = true, userinfos });
+
+                }
+                else
+                {
+                    return BadRequest(new { Status = false, userinfos });
+
+                }
+
+            }
+
+            else
+            {
+                return BadRequest(new { Status = false,message="old password in incorrect", userinfos });
+
+            }
+
 
         }
 

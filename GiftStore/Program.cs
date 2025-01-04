@@ -162,7 +162,7 @@ builder.Services.AddSingleton<IConfiguration>(builder.Configuration);
 #region dbContext
 builder.Services.AddDbContext<Db_API>(options =>
 {
-    options.UseSqlServer(builder.Configuration["defultConnection"]); //          localConnection                                                        
+    options.UseSqlServer(builder.Configuration["defultConnection"]); //  localConnection                                                                
 });
 
 

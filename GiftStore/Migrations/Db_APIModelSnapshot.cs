@@ -22,6 +22,39 @@ namespace GiftStore.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("GiftStore.Models.ActivityLog", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("LogDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UserRole")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("activityLogs");
+                });
+
             modelBuilder.Entity("GiftStore.Models.Contact_us", b =>
                 {
                     b.Property<int>("Id")
@@ -85,6 +118,9 @@ namespace GiftStore.Migrations
 
                     b.Property<int>("UserId")
                         .HasColumnType("int");
+
+                    b.Property<string>("UserName")
+                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 
@@ -336,6 +372,17 @@ namespace GiftStore.Migrations
                     b.ToTable("walletLogs");
                 });
 
+            modelBuilder.Entity("GiftStore.Models.ActivityLog", b =>
+                {
+                    b.HasOne("GiftStore.Models.Users", "user")
+                        .WithMany("activityLogs")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("user");
+                });
+
             modelBuilder.Entity("GiftStore.Models.Factors", b =>
                 {
                     b.HasOne("GiftStore.Models.GiftCards", "GiftCard")
@@ -402,6 +449,8 @@ namespace GiftStore.Migrations
             modelBuilder.Entity("GiftStore.Models.Users", b =>
                 {
                     b.Navigation("WalletLogs");
+
+                    b.Navigation("activityLogs");
                 });
 #pragma warning restore 612, 618
         }

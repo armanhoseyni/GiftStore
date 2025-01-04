@@ -16,6 +16,7 @@ namespace GiftStore.Data
         public DbSet<UserStarsLog> userStarsLogs { get; set; }
         public DbSet<TicketChats> ticketChats{ get; set; }
         public DbSet<WalletLog> walletLogs{ get; set; }
+        public DbSet<ActivityLog> activityLogs{ get; set; }
       
 
         public Db_API(DbContextOptions<Db_API> options) : base(options)
@@ -43,6 +44,11 @@ namespace GiftStore.Data
               .HasOne(w => w.user)
               .WithMany(u => u.WalletLogs)
               .HasForeignKey(w => w.UserId);
+
+            modelBuilder.Entity<ActivityLog>()
+            .HasOne(w => w.user)
+            .WithMany(u => u.activityLogs)
+            .HasForeignKey(w => w.UserId);
 
 
 

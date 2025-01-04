@@ -17,6 +17,7 @@ namespace GiftStore.Models
         public int GiftId { get; set; }
 
         public double? FactorPrice { get; set; } // New field
+        public string? UserName { get; set; } // New field
 
         // Navigation properties
 
