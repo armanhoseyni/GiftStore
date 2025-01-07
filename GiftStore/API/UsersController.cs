@@ -5,6 +5,9 @@ using GiftStore.ViewModels;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.ComponentModel;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace GiftStore.API
 {
@@ -120,6 +123,7 @@ namespace GiftStore.API
         /// Determine the content type of a file
         /// </summary>
 
+        //تیکت ها
 
         /// <summary>
         /// Get all tickets for a specific user
@@ -129,7 +133,7 @@ namespace GiftStore.API
         [HttpGet("/get-GetAllTickets")]
         public IActionResult GetAllTickets([FromQuery] int id)
         {
-            var tickets = db.tickets.Where(x => x.UserId == id);
+            var tickets = db.tickets.Where(x => x.UserId == id).OrderByDescending(x=>x.Id);
 
             return Ok(new { Status = true, tickets });
 
@@ -211,12 +215,10 @@ namespace GiftStore.API
                 newRes.message = model.Response;
                 newRes.TicketId = id;
                 db.ticketChats.Add(newRes);
-                if (db.SaveChanges() == 1)
+                db.SaveChanges();
                     return Ok(new { Status = true, chat });
 
-                else
-                    return BadRequest(new { Status = false, message = "Failed " });
-
+               
 
             }
             else
@@ -249,6 +251,19 @@ namespace GiftStore.API
         /// </summary>
         /// <param name="id"></param>
         /// <returns></returns>
+        /// 
+
+
+        [HttpGet("/GetAllRequests")]
+        public IActionResult GetAllRequests([FromQuery] int id)
+        {
+            var reqs = db.userStarsLogs.Where(x => x.Status == "Waiting" &&x.UserId==id).OrderByDescending(x => x.Id).ToList(); 
+            return Ok(new { reqs, Status = true });
+
+
+        }
+
+
         [HttpGet("/GetUserStars")]
         public IActionResult GetUserStars([FromQuery] int id)
         {
@@ -268,18 +283,32 @@ namespace GiftStore.API
         [HttpGet("/GetUserStarsLog")]
         public IActionResult GetUserStarsLog([FromQuery] int id)
         {
-            var  logss= db.userStarsLogs.Where(x => x.UserId == id);
-            if (logss.Any())
+            var logss = db.userStarsLogs.Where(x => x.UserId == id).OrderByDescending(x => x.Id);
+            // Fetch factors for the given user ID
+           
+            // Create a list to store the modified factors with decrypted codes
+            var SuccessdLogs = new List<object>();
+
+            // Iterate through each factor
+            foreach (var log in logss)
             {
-                return Ok(new { Status = true, logss });
+                // Call the GetGiftCard method to decrypt the gift card code
+              
+                // Add the decrypted code to the factor object
+                var seccesed = new
+                {
+                   UserId=log.UserId,
+                   Star=log.Star,
+                   Type=log.Type,
+                   LogDate=log.LogDate,
 
+         
+                };
+
+                // Add the modified factor to the list
+                SuccessdLogs.Add(seccesed);
             }
-            else
-            {
-                return Ok(new { Status = true,logss });
-
-
-            }
+            return Ok(new {Status=true, SuccessdLogs });
         }
 
         [HttpPost("/RequestWithdraw")]
@@ -297,7 +326,7 @@ namespace GiftStore.API
 
                 if (user == null)
                 {
-                    return Ok("User not found");
+                    return Ok( new { message="کاربری پیدا نشد" ,Status=false});
                 }
 
                 // Create a new UserStarsLog entry
@@ -305,7 +334,7 @@ namespace GiftStore.API
                 {
                     UserId = id,
                     Star = user.Stars, // Assuming the user's current stars are to be logged
-                    Type = "out", // Assuming this is a withdrawal, so type is "out"
+                    Type = "0", // Assuming this is a withdrawal, so type is "out"
                     LogDate = DateTime.Now,
                     Status = "Waiting" // Initial status is "Waiting"
                 };
@@ -354,7 +383,7 @@ namespace GiftStore.API
         [HttpGet("/GetUserWalletlog")]
         public IActionResult GetUserWalletlog([FromQuery] int id)
         {
-            var logss = db.walletLogs.Where(x => x.UserId == id).ToList();
+            var logss = db.walletLogs.Where(x => x.UserId == id).OrderByDescending(x => x.Id).ToList();
 
             return Ok(new { Status = true, logss });
 
@@ -362,32 +391,54 @@ namespace GiftStore.API
         }
 
         /////
-    
-/// <summary>
-/// orders
-/// </summary>
-/// <param name="id"></param>
-/// <returns></returns>
+
+        /// <summary>
+        /// orders
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns></returns>
         [HttpGet("/GetUserFactors")]
         public IActionResult GetUserFactors([FromQuery] int id)
         {
-            var factors = db.factors.Where(x => x.UserId == id);
-            if (factors.Any())
+            // Fetch factors for the given user ID
+            var factors = db.factors.Where(x => x.UserId == id).OrderByDescending(x => x.Id).ToList();
+
+            // Create a list to store the modified factors with decrypted codes
+            var factorsWithDecryptedCodes = new List<object>();
+
+            // Iterate through each factor
+            foreach (var factor in factors)
             {
-                return Ok(new { Status = true, factors });
+                // Call the GetGiftCard method to decrypt the gift card code
+                string decryptedCode = GetGiftCard(factor.GiftId);
 
+                // Add the decrypted code to the factor object
+                var factorWithDecryptedCode = new
+                {
+                    id = factor.Id,
+                    userId = factor.UserId,
+                    factorDate = factor.FactorDate,
+                    giftId = factor.GiftId,
+                    factorPrice = factor.FactorPrice,
+                    userName = factor.UserName,
+                    user = factor.User,
+                    giftCard = factor.GiftCard,
+                    status = factor.Status,
+                    type = factor.Type,
+                    transActionNumber = factor.TransActionNumber,
+                    decryptedcode = decryptedCode // Add the decrypted code here
+                };
+
+                // Add the modified factor to the list
+                factorsWithDecryptedCodes.Add(factorWithDecryptedCode);
             }
-            else
-            {
-                return Ok(new { Status = true, factors });
 
-
-            }
+            // Return the response with the modified factors
+            return Ok(new { Status = true, factors = factorsWithDecryptedCodes });
         }
 
-
         [HttpGet("/GetGiftCard/{id}")]
-        public IActionResult GetGiftCard(int id)
+        public string GetGiftCard(int id)
         {
             try
             {
@@ -397,7 +448,7 @@ namespace GiftStore.API
                 // Check if the file exists
                 if (!System.IO.File.Exists(filePath))
                 {
-                    return NotFound(new { Status = false, Message = "Excel file not found." });
+                    return"Excel file not found.";
                 }
 
                 // Open the Excel file
@@ -415,7 +466,7 @@ namespace GiftStore.API
 
                     if (row == null)
                     {
-                        return NotFound(new { Status = false, Message = "Gift card not found." });
+                        return "Gift card not found;";
                     }
 
                     // Extract data from the row
@@ -429,18 +480,13 @@ namespace GiftStore.API
                     string decryptedResult = en.Decrypt(encryptedResult, key, ivKey);
 
                     // Return the decrypted data
-                    return Ok(new
-                    {
-                        Status = true,
-                        Label = label,
-                        DecryptedResult = decryptedResult,                    
-                        Message = "Gift card retrieved successfully."
-                    });
+                    return decryptedResult                    
+                        ;
                 }
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { Status = false, Message = $"An error occurred: {ex.Message}" });
+                return "An error";
             }
         }
 
@@ -451,7 +497,7 @@ namespace GiftStore.API
         [HttpGet("/GetUserActivityLogs")]
         public IActionResult GetUserActivityLogs([FromQuery] int id)
         {
-            var activitylogs = db.activityLogs.Where(x => x.UserId == id && x.Description=="ورود" || x.Description == "خروج").ToList();
+            var activitylogs = db.activityLogs.Where(x => x.UserId == id && x.Description=="ورود" || x.Description == "خروج").OrderByDescending(x => x.Id).ToList();
 
             return Ok(new { Status = true, activitylogs });
 
@@ -468,7 +514,7 @@ namespace GiftStore.API
         }
 
         /// <summary>
-        /// //
+        /// //پروفایل
         /// </summary>
         /// <param name="mdoel"></param>
         /// <param name="id"></param>
@@ -477,50 +523,61 @@ namespace GiftStore.API
         public IActionResult UpdateUserInfos([FromBody] UpdateUserProfileViewModel mdoel,[FromQuery]int id )
         {
             var userinfos = db.users.FirstOrDefault(x => x.Id == id);
+            if (userinfos == null)
+            {
+                return Ok(new { Status = false, message = "کاربری پیدا نشد" });
+
+            }
             userinfos.FirstName=mdoel.FirstName;
             userinfos.LastName=mdoel.LastName;
             userinfos.Phone=mdoel.Phone;
             userinfos.Email=mdoel.Email;
-            if (db.SaveChanges() == 1)
-            {
-                return Ok(new { Status = true, userinfos });
+            db.SaveChanges();
 
-            }
-            else
-            {
-                return BadRequest(new { Status = false, userinfos });
+            return Ok(new { Status = true, userinfos });
 
-            }
+
 
         }
         [HttpPost("/UpdateUserPass")]
         public IActionResult UpdateUserPass(string oldpass,string newpas ,[FromQuery] int id)
         {
             var userinfos = db.users.FirstOrDefault(x => x.Id == id);
-            if(userinfos.Password == oldpass)
+            if(userinfos == null)
             {
-                    userinfos.Password = newpas;
-                if (db.SaveChanges() == 1)
-                {
+                return Ok(new { Status = false, message = "کاربری پیدا نشد" });
+
+            }
+        
+            if (userinfos.Password == HashPassword( oldpass))
+            {
+                    userinfos.Password = HashPassword( newpas);
+                db.SaveChanges() 
+                ;
                     return Ok(new { Status = true, userinfos });
 
-                }
-                else
-                {
-                    return BadRequest(new { Status = false, userinfos });
-
-                }
+               
 
             }
 
             else
             {
-                return BadRequest(new { Status = false,message="old password in incorrect", userinfos });
+                return BadRequest(new { Status = false,message="پسورد فعلی اشتباه میباشد", userinfos });
 
             }
 
 
         }
+        private string HashPassword(string password)
+        {
+            using (var sha256 = SHA256.Create())
+            {
+                var bytes = Encoding.UTF8.GetBytes(password);
+                var hash = sha256.ComputeHash(bytes);
+                return Convert.ToBase64String(hash);
+            }
+        }
+
 
     }
 }

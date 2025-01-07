@@ -14,7 +14,7 @@ namespace GiftStore.Models
         public string Type { get; set; } // "Income" or "Out"
         public decimal Amount { get; set; } // Amount of the transaction
         public DateTime LogDate { get; set; } // Date of the transaction
-        public string Status { get; set; } // "Waiting" or "Success"
+        public bool Status { get; set; } // "Waiting" or "Success"
 
         public Users user { get; set; } // N
 

@@ -167,6 +167,8 @@ builder.Services.AddDbContext<Db_API>(options =>
 
 
 #endregion
+// use in OTP 
+builder.Services.AddSingleton<IConfiguration>(builder.Configuration);
 
 
 // Register IMemoryCache

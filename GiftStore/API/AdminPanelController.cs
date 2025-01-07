@@ -93,17 +93,11 @@ namespace GiftStore.API
             };
 
             db.users.Add(user);
-            if (db.SaveChanges()==1)
-            {
+            db.SaveChanges();
+            
                 return Ok(new { Status = true, message = "User added successfully.", User = user });
 
-            }
-            else
-            {
-                return BadRequest(new { Status = false, message = "fail", User = user });
-
-            }
-
+         
 
         }
 
@@ -541,9 +535,8 @@ namespace GiftStore.API
             };
 
             db.giftCards.Add(newCard);
-            if (db.SaveChanges() == 1)
-            {
-
+            db.SaveChanges();
+            
                 string directory = @"wwwroot/GiftCards/GiftCards.xlsx";
                 SaveToExcel1(newCard.Id, randomdigit, result, Key, IVKey, directory);
 
@@ -555,11 +548,7 @@ namespace GiftStore.API
                 }
 
                 return Ok(new { Status = true, newCard, message = "کارت با موفقیت ثبت شد", StatusCode = 200 });
-            }
-            else
-                return Ok(new { Status = false, message = "Failed " });
-
-
+          
             
         }
 
@@ -713,13 +702,11 @@ namespace GiftStore.API
             if (DeleteRow(label))
             {
                 db.giftCards.Remove(Gc);
-                if (db.SaveChanges() == 1)
+                db.SaveChanges();
                    // return Ok(new { Status = true, newlog, message = "امتیازات این کاربر اضافه شد" });
                 return Ok(new { Status = true, message = "گیفت کارت با موفقیت حذف شد" });
 
-                else
-                    return BadRequest(new { Status = false, message = "Failed " });
-
+               
 
 
             }
@@ -781,16 +768,12 @@ namespace GiftStore.API
             giftcard.ExpDate = model.ExpDate;
             giftcard.Status = model.status;
 
-            if (db.SaveChanges() == 1) {
+           db.SaveChanges() ;
                 string directory = @"wwwroot/GiftCards/GiftCards.xlsx";
                 UpdateExcel(label, encryptedCode, newKey, IVkey, directory);
                 return Ok(new { Status = true, message = "اطلاعات با موفقیت بروزرسانی شد", StatusCode = 200 });
               
-            }
-              
-            else
-                return BadRequest(new { Status = false, message = "Failed " });
-
+         
 
 
           
@@ -1004,12 +987,10 @@ namespace GiftStore.API
                 newRes.message = model.Response;
                 newRes.TicketId = id;
                 db.ticketChats.Add(newRes);
-                if (db.SaveChanges() == 1)
+                db.SaveChanges();
                     return Ok(new { Status = true, message = "تیکت با موفقیت پاسخ داده شد", chat });
 
-                else
-                    return BadRequest(new { Status = false, message = "Failed " });
-
+               
 
 
             }
@@ -1030,11 +1011,9 @@ namespace GiftStore.API
             }
 
             ticket.Status = "بسته شده";
-            if (db.SaveChanges() == 1)
+            db.SaveChanges() ;
                 return Ok(new { Status = true, message = "تیکت با موفقیت پاسخ داده شد", ticket });
-            else
-                return BadRequest(new { Status = false, message = "Failed " });
-
+         
 
            
         }
@@ -1055,12 +1034,10 @@ namespace GiftStore.API
                 };
 
                 db.telegramStars.Add(model);
-                if (db.SaveChanges() == 1)
+                db.SaveChanges();
                     return Ok(new { Status = true, model});
 
-                else
-                    return BadRequest(new { Status = false, message = "Failed " });
-
+               
 
             }
             else
@@ -1098,11 +1075,9 @@ namespace GiftStore.API
                 };
 
                 db.telegramStars.Add(model);
-                if (db.SaveChanges() == 1)
+                db.SaveChanges();
                     return Ok(new { Status = true, model});
 
-                else
-                    return BadRequest(new { Status = false, message = "Failed " });
             }
             else
             {
@@ -1123,11 +1098,16 @@ namespace GiftStore.API
 
 
         }
+
+
+
+
+
         [HttpPost("/removeStars")]
         public IActionResult removeStars([FromQuery] int id)
         {
             
-        var UserRequest=db.userStarsLogs.Where(x=>x.UserId == id).FirstOrDefault();
+        var UserRequest=db.userStarsLogs.Where(x=>x.UserId == id &&x.Status=="Waiting").FirstOrDefault();
             if (UserRequest == null)
             {
                 return Ok(new { Status = false, message = "درخاستی از طرف این کاربر یافت نشد" });
@@ -1139,24 +1119,17 @@ namespace GiftStore.API
     .FirstOrDefault(); // Get the first row (which has the highest Id)
                 var minStars = lastRow.MinStars;
 
-                if (UserRequest.Status == "Waiting")
-                {
+               
                     var user = db.users.FirstOrDefault(x => x.Id == id);
                     user.Stars = 0;
                     UserRequest.Status = "success";
-                    if (db.SaveChanges() == 1)
+                db.SaveChanges();
                         return Ok(new { Status = true, user});
 
-                    else
-                        return BadRequest(new { Status = false, message = "Failed " });
+                    
 
-
-                }
-                else
-                {
-                    return BadRequest(new { Status = false, message = "به این درخاست قبلا رسیدگی شده است" });
-
-                }
+                
+               
             }
         
         }
@@ -1177,7 +1150,7 @@ namespace GiftStore.API
 
 
                 newlog.Star = stars;
-                newlog.Type = "out";
+                newlog.Type = "0";
                 newlog.Status = "success";
                 newlog.LogDate = DateTime.Now;
                 newlog.UserId = id;
@@ -1188,13 +1161,10 @@ namespace GiftStore.API
 
                 db.userStarsLogs.Add(newlog);
 
-                if (db.SaveChanges() == 1)
+               db.SaveChanges() ;
                     return Ok(new { Status = true, user, message = "امتیازات این کاربر کم شد شد" });
 
-                else
-                    return BadRequest(new { Status = false, message = "Failed " });
-
-
+              
             }
 
 
@@ -1209,20 +1179,20 @@ namespace GiftStore.API
         [HttpPost("/AddStars")]
         public IActionResult AddStars([FromQuery] int id, [FromQuery] int addstars)
         {
-          
+
 
 
             var user = db.users.FirstOrDefault(x => x.Id == id);
             if (user != null)
             {
-                user.Stars = user.Stars+ addstars;
+                user.Stars = user.Stars + addstars;
                 db.SaveChanges();
 
                 var newlog = new UserStarsLog();
 
 
                 newlog.Star = addstars;
-                newlog.Type = "income";
+                newlog.Type = "1";
                 newlog.Status = "success";
                 newlog.LogDate = DateTime.Now;
                 newlog.UserId = id;
@@ -1232,14 +1202,11 @@ namespace GiftStore.API
 
 
                 db.userStarsLogs.Add(newlog);
-                
-                if (db.SaveChanges() == 1)
+
+              db.SaveChanges() ;
                     return Ok(new { Status = true, user, message = "امتیازات این کاربر اضافه شد" });
 
-                else
-                    return BadRequest(new { Status = false, message = "Failed " });
-
-
+              
             }
 
 
@@ -1251,6 +1218,27 @@ namespace GiftStore.API
             }
 
         }
+
+
+
+
+
+
+
+
+
+
+
+        [HttpGet("/GetAllRequestsAdmin")]
+        public IActionResult GetAllRequests()
+        {
+            var reqs = db.userStarsLogs.Where(x => x.Status == "Waiting").ToList();
+            return Ok(new { reqs, Status = true });
+
+
+        }
+
+
         /////Factors
         /// <summary>
         /// 
@@ -1556,15 +1544,10 @@ namespace GiftStore.API
                 Name= db.users.Where(x => x.Id == model.UserId).Select(x => x.LastName).FirstOrDefault()+ db.users.Where(x => x.Id == model.UserId).Select(x => x.LastName).FirstOrDefault()
             };
             db.activityLogs.Add(newlog);
-            if (db.SaveChanges() == 1)
-            {
+           db.SaveChanges();
+            
                 return Ok(new {Status=true,newlog});
-            }
-            else
-            {
-                return BadRequest(new {Status=false,newlog});
-            }
-
+           
 
         }
 
