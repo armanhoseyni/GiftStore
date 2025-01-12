@@ -61,11 +61,18 @@ using System.Text;
 using GiftStore.Data;
 using GiftStore.Models;
 using GiftStore.Services;
+using GiftStore.Services.Sms;
+using GiftStore.ViewModels.Payment;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.SwaggerUI;
+using Zarinpal.AspNetCore.Extensions;
+using Zarinpal.AspNetCore.Interfaces;
+using Microsoft.Extensions.Options;
+using System.Net.Http.Json;
+using GiftStore.Services.Payment;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -83,6 +90,7 @@ builder.Services.AddCors(options =>
     });
 });
 #endregion policy
+
 
 // HttpClient
 builder.Services.AddHttpClient();
@@ -173,6 +181,14 @@ builder.Services.AddSingleton<IConfiguration>(builder.Configuration);
 
 // Register IMemoryCache
 builder.Services.AddMemoryCache();
+
+// sms.ir
+builder.Services.AddTransient<ISmsService, SmsService>();
+
+// zarinpal
+builder.Services.AddTransient<IZarinPalService, ZarinPalService>();
+
+builder.Services.Configure<ZarinpalSettings>(builder.Configuration.GetSection("Zarinpal"));
 
 
 var app = builder.Build();

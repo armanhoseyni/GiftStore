@@ -11,6 +11,8 @@
     <PackageReference Include="EPPlus" Version="7.5.2" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.10" />
 	  <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.8" />
+	  <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+	  <PackageReference Include="SmsIrRestfulNetCore" Version="1.1.4" />
 	  <PackageReference Include="Swashbuckle.AspNetCore" Version="6.9.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.0" />
 	  <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.1" />
@@ -20,6 +22,8 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+    <PackageReference Include="System.Text.Json" Version="9.0.0" />
+    <PackageReference Include="Zarinpal.AspNetCore" Version="3.1.0" />
   </ItemGroup>
 
   <ItemGroup>
