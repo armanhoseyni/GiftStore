@@ -15,8 +15,8 @@ namespace GiftStore.Models
         public int Importance { get; set; } // Assuming importance is an integer value
         public string Description { get; set; }
         public string Title { get; set; }
-       public string DocumentPath { get; set; }
-        
+       public string? DocumentPath { get; set; }
+       // public ICollection<TicketChats> TicketChats { get; set; }
         public string Status { get; set; }//تیکت‌های باز، پاسخ‌داده‌شده و بسته‌شده.
 
         public DateTime SendDate { get; set; } 

@@ -17,6 +17,9 @@ namespace GiftStore.Data
         public DbSet<TicketChats> ticketChats{ get; set; }
         public DbSet<WalletLog> walletLogs{ get; set; }
         public DbSet<ActivityLog> activityLogs{ get; set; }
+        public DbSet<Notifications> notifications{ get; set; }
+        public DbSet<Roles> roles{ get; set; }
+        public DbSet<SmsBank> smsBanks{ get; set; }
       
 
         public Db_API(DbContextOptions<Db_API> options) : base(options)
@@ -39,7 +42,7 @@ namespace GiftStore.Data
              .HasOne(f => f.user)
              .WithMany()
              .HasForeignKey(f => f.UserId);
-
+           
             modelBuilder.Entity<WalletLog>()
               .HasOne(w => w.user)
               .WithMany(u => u.WalletLogs)
@@ -56,6 +59,13 @@ namespace GiftStore.Data
        .HasOne(f => f.tickets)
        .WithMany()
        .HasForeignKey(f => f.TicketId);
+
+
+
+            //modelBuilder.Entity<TicketChats>()
+            //    .HasOne(tc => tc.tickets) // Correct: Use the navigation property
+            //    .WithMany(t => t.TicketChats) // Correct: Specify the collection navigation property
+            //    .HasForeignKey(tc => tc.TicketId); // Correct: Use the foreign key property
 
             modelBuilder.Entity<Tickets>()
   .HasOne(f => f.user)

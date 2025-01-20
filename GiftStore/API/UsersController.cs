@@ -27,10 +27,19 @@ namespace GiftStore.API
         [HttpPost("/CreateTicket")]
         public IActionResult CreateTicket(AddTicketViewModel model)
         {
+            var path = "";
             Services.Documents documentsService = new Services.Documents();
             string filePath = @"wwwroot\Documents";
             var checkuser = db.users.FirstOrDefault(x => x.Id == model.UserId);
 
+            if (!string.IsNullOrEmpty(documentsService.UploadFile(model.Document, filePath)))
+            {
+                path = documentsService.UploadFile(model.Document, filePath);
+            }
+            else
+            {
+                path = null;
+            }
             if (checkuser == null)
             {
                 return BadRequest(new { Status = false, message = "کاربری یافت نشد", StatusCode = 200 });
@@ -43,7 +52,8 @@ namespace GiftStore.API
                 SendDate = DateTime.Now,
                 Status = "باز",
                 UserId = model.UserId,
-                DocumentPath = documentsService.UploadFile(model.Document, filePath)
+
+                DocumentPath = path,
             };
 
             db.tickets.Add(newticket);
@@ -51,11 +61,11 @@ namespace GiftStore.API
             TicketChats newChat = new TicketChats
             {
                 message = model.Description,
-                
+
                 SendDate = DateTime.Now,
-                Sender  =0,
-               TicketId = newticket.Id,
-                DocumentPath = documentsService.UploadFile(model.Document, filePath)
+                Sender = 0,
+                TicketId = newticket.Id,
+                DocumentPath = path
             };
 
             db.ticketChats.Add(newChat);
@@ -85,9 +95,53 @@ namespace GiftStore.API
             {
                 return BadRequest(new { Status = false, message = "خطا در آپلود فایل", StatusCode = 200 });
             }
+            var path = "";
+            if (!string.IsNullOrEmpty(documentPath))
+            {
+                path = documentPath;
+            }
+            else
+            {
+                path = null;
+            }
+            // Update the DocumentPath field in the ticket
+            ticket.DocumentPath = path;
+            db.SaveChanges();
+
+            return Ok(new { Status = true, message = "فایل با موفقیت آپلود شد و مسیر آن ذخیره شد", ticket });
+        }
+
+        [HttpPost("/UpdateTicketChatDocument")]
+        public IActionResult UpdateTicketChatDocument(int id, IFormFile file)
+        {
+            // Find the ticket by ID
+            var ticket = db.ticketChats.FirstOrDefault(t => t.TicketId == id);
+            if (ticket == null)
+            {
+                return BadRequest(new { Status = false, message = "تیکتی با این شناسه یافت نشد", StatusCode = 200 });
+            }
+
+            // Define the directory to save the file
+            string filePath = @"wwwroot\Documents";
+            var path = "";
+            // Upload the file and get the saved file path
+            Services.Documents documentsService = new Services.Documents();
+            string documentPath = documentsService.UploadFile(file, filePath);
+            if (!string.IsNullOrEmpty(documentPath))
+            {
+                path = documentPath;
+            }
+            else
+            {
+                path = null;
+            }
+            if (string.IsNullOrEmpty(documentPath))
+            {
+                return BadRequest(new { Status = false, message = "خطا در آپلود فایل", StatusCode = 200 });
+            }
 
             // Update the DocumentPath field in the ticket
-            ticket.DocumentPath = documentPath;
+            ticket.DocumentPath = path;
             db.SaveChanges();
 
             return Ok(new { Status = true, message = "فایل با موفقیت آپلود شد و مسیر آن ذخیره شد", ticket });
@@ -113,11 +167,8 @@ namespace GiftStore.API
             }
 
             // Remove the "wwwroot" prefix and replace backslashes with forward slashes
-            string correctedFilePath = filePath
-                .Replace("wwwroot\\", "") // Remove "wwwroot\"
-                .Replace("\\", "/");      // Replace backslashes with forward slashes
 
-            return Ok(new { File = "https://gifteto.net/" + correctedFilePath });
+            return Ok(new { File = "https://gifteto.net/" + filePath });
         }
         /// <summary>
         /// Determine the content type of a file
@@ -133,7 +184,7 @@ namespace GiftStore.API
         [HttpGet("/get-GetAllTickets")]
         public IActionResult GetAllTickets([FromQuery] int id)
         {
-            var tickets = db.tickets.Where(x => x.UserId == id).OrderByDescending(x=>x.Id);
+            var tickets = db.tickets.Where(x => x.UserId == id).OrderByDescending(x => x.Id);
 
             return Ok(new { Status = true, tickets });
 
@@ -142,14 +193,26 @@ namespace GiftStore.API
         [HttpGet("/get-GetAllTicketChats")]
         public IActionResult GetAllTicketChats([FromQuery] int id)
         {
-          
+
             var chat = db.ticketChats.Where(x => x.TicketId == id).ToList();
+
             if (chat.Count <= 0)
             {
-                return Ok(new { Status = true, message = "چتی از طرف این کاربر وجود ندارد",chat, StatusCode = 200 });
+                return Ok(new { Status = true, message = "چتی از طرف این کاربر وجود ندارد", chat, StatusCode = 200 });
             }
 
-            return Ok(new { Status = true, chat, StatusCode = 200 });
+            var ticketStatus1 = db.tickets
+             .Where(t => t.Id == id)
+             .Select(t => t.Status)
+             .FirstOrDefault(); // Use FirstOrDefault to get a single value
+
+            var ticketStatus = true;
+            if (ticketStatus1 == "بسته شده")
+            {
+                ticketStatus = false;
+            }
+
+            return Ok(new { Status = true, ticketStatus, chat, StatusCode = 200 });
         }
 
 
@@ -197,10 +260,15 @@ namespace GiftStore.API
         }
 
         [HttpPost("/SendMessageToTickets")]
-        public IActionResult SendMessageToTickets([FromQuery] int id, [FromBody] ViewModelResponseToTickets model)
+        public IActionResult SendMessageToTickets([FromQuery] int id, ViewModelResponseToTickets model)
         {
             var chat = db.tickets.FirstOrDefault(u => u.Id == id);
 
+            string filePath = @"wwwroot\Documents";
+
+            // Upload the file and get the saved file path
+            Services.Documents documentsService = new Services.Documents();
+            string documentPath = documentsService.UploadFile(model.Document, filePath);
 
             if (chat == null)
             {
@@ -214,11 +282,21 @@ namespace GiftStore.API
                 newRes.SendDate = DateTime.Now;
                 newRes.message = model.Response;
                 newRes.TicketId = id;
+
+                if (!string.IsNullOrEmpty(documentPath))
+                {
+                    newRes.DocumentPath = documentPath;
+                }
+                else
+                {
+                    newRes.DocumentPath = null;
+                }
+
                 db.ticketChats.Add(newRes);
                 db.SaveChanges();
-                    return Ok(new { Status = true, chat });
+                return Ok(new { Status = true, newRes });
 
-               
+
 
             }
             else
@@ -226,11 +304,12 @@ namespace GiftStore.API
                 return BadRequest(new { Status = false, message = "چت بسته شده است" });
             }
         }
-/// <summary>
-/// ////داشبورد
-/// </summary>
-/// <param name="id"></param>
-/// <returns></returns>
+
+        /// <summary>
+        /// ////داشبورد
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns></returns>
         [HttpGet("/GetDashbordInformatons")]
         public IActionResult GetDashbordInformatons([FromQuery] int id)
         {
@@ -241,10 +320,10 @@ namespace GiftStore.API
             }
 
             var wallet = user.wallet;
-            var giftcardcount=db.factors.Where(x=> x.UserId == id).Count();
+            var giftcardcount = db.factors.Where(x => x.UserId == id).Count();
             var stars = user.Stars;
-          
-            return Ok(new { Status = true, wallet,giftcardcount,stars});
+
+            return Ok(new { Status = true, wallet, giftcardcount, stars });
         }
         /// <summary>
         /// /score
@@ -257,7 +336,7 @@ namespace GiftStore.API
         [HttpGet("/GetAllRequests")]
         public IActionResult GetAllRequests([FromQuery] int id)
         {
-            var reqs = db.userStarsLogs.Where(x => x.Status == "Waiting" &&x.UserId==id).OrderByDescending(x => x.Id).ToList(); 
+            var reqs = db.userStarsLogs.Where(x =>  x.UserId == id&&x.Type=="0").OrderByDescending(x => x.Id).ToList();
             return Ok(new { reqs, Status = true });
 
 
@@ -267,7 +346,7 @@ namespace GiftStore.API
         [HttpGet("/GetUserStars")]
         public IActionResult GetUserStars([FromQuery] int id)
         {
-            var stars = db.users.Where(x=>x.Id== id).Select(x=>x.Stars);
+            var stars = db.users.Where(x => x.Id == id).Select(x => x.Stars);
             if (stars.Any())
             {
                 return Ok(new { Status = true, stars });
@@ -275,7 +354,7 @@ namespace GiftStore.API
             }
             else
             {
-                return Ok(new { Status = true});
+                return Ok(new { Status = true });
 
 
             }
@@ -283,9 +362,9 @@ namespace GiftStore.API
         [HttpGet("/GetUserStarsLog")]
         public IActionResult GetUserStarsLog([FromQuery] int id)
         {
-            var logss = db.userStarsLogs.Where(x => x.UserId == id).OrderByDescending(x => x.Id);
+            var logss = db.userStarsLogs.Where(x => x.UserId == id).Where(x=>x.Status=="success").OrderByDescending(x => x.Id);
             // Fetch factors for the given user ID
-           
+
             // Create a list to store the modified factors with decrypted codes
             var SuccessdLogs = new List<object>();
 
@@ -293,22 +372,22 @@ namespace GiftStore.API
             foreach (var log in logss)
             {
                 // Call the GetGiftCard method to decrypt the gift card code
-              
+
                 // Add the decrypted code to the factor object
                 var seccesed = new
                 {
-                   UserId=log.UserId,
-                   Star=log.Star,
-                   Type=log.Type,
-                   LogDate=log.LogDate,
+                    UserId = log.UserId,
+                    Star = log.Star,
+                    Type = log.Type,
+                    LogDate = log.LogDate,
 
-         
+
                 };
 
                 // Add the modified factor to the list
                 SuccessdLogs.Add(seccesed);
             }
-            return Ok(new {Status=true, SuccessdLogs });
+            return Ok(new { Status = true, SuccessdLogs });
         }
 
         [HttpPost("/RequestWithdraw")]
@@ -318,15 +397,16 @@ namespace GiftStore.API
 .OrderByDescending(t => t.Id) // Sort by Id in descending order
 .FirstOrDefault(); // Get the first row (which has the highest Id)
             var minStars = lastRow.MinStars;
-            
+
             // Retrieve the user from the database
             var user = db.users.FirstOrDefault(x => x.Id == id);
-            if (user.Stars > minStars) {
+            if (user.Stars > minStars)
+            {
 
 
                 if (user == null)
                 {
-                    return Ok( new { message="کاربری پیدا نشد" ,Status=false});
+                    return Ok(new { message = "کاربری پیدا نشد", Status = false });
                 }
 
                 // Create a new UserStarsLog entry
@@ -336,7 +416,8 @@ namespace GiftStore.API
                     Star = user.Stars, // Assuming the user's current stars are to be logged
                     Type = "0", // Assuming this is a withdrawal, so type is "out"
                     LogDate = DateTime.Now,
-                    Status = "Waiting" // Initial status is "Waiting"
+                    Status = "Waiting" ,
+                    Username=user.Username// Initial status is "Waiting"
                 };
 
                 // Add the new log entry to the database
@@ -347,12 +428,12 @@ namespace GiftStore.API
                 // Save changes to the database
                 db.SaveChanges();
 
-                return Ok(new { Status=true,newLog });
+                return Ok(new { Status = true, newLog });
             }
             else
             {
 
-                return BadRequest(new {Status=false,message="تعداد ستاره های شماره کمتراز حد مجاز است",MinStarNeed=minStars});
+                return BadRequest(new { Status = false, message = "تعداد ستاره های شماره کمتراز حد مجاز است", MinStarNeed = minStars });
 
             }
 
@@ -372,11 +453,11 @@ namespace GiftStore.API
         [HttpGet("/GetUserWallet")]
         public IActionResult GetUserWallet([FromQuery] int id)
         {
-            var dollar = db.users.Where(x => x.Id == id).Select(x=>x.wallet).FirstOrDefault();
-           
-                return Ok(new { Status = true, dollar });
+            var dollar = db.users.Where(x => x.Id == id).Select(x => x.wallet).FirstOrDefault();
 
-             
+            return Ok(new { Status = true, dollar });
+
+
         }
 
 
@@ -448,7 +529,7 @@ namespace GiftStore.API
                 // Check if the file exists
                 if (!System.IO.File.Exists(filePath))
                 {
-                    return"Excel file not found.";
+                    return "Excel file not found.";
                 }
 
                 // Open the Excel file
@@ -480,7 +561,7 @@ namespace GiftStore.API
                     string decryptedResult = en.Decrypt(encryptedResult, key, ivKey);
 
                     // Return the decrypted data
-                    return decryptedResult                    
+                    return decryptedResult
                         ;
                 }
             }
@@ -497,7 +578,7 @@ namespace GiftStore.API
         [HttpGet("/GetUserActivityLogs")]
         public IActionResult GetUserActivityLogs([FromQuery] int id)
         {
-            var activitylogs = db.activityLogs.Where(x => x.UserId == id && x.Description=="ورود" || x.Description == "خروج").OrderByDescending(x => x.Id).ToList();
+            var activitylogs = db.activityLogs.Where(x => x.UserId == id && x.Description == "ورود" || x.Description == "خروج").OrderByDescending(x => x.Id).ToList();
 
             return Ok(new { Status = true, activitylogs });
 
@@ -506,7 +587,7 @@ namespace GiftStore.API
         [HttpGet("/GetUserInfos")]
         public IActionResult GetUserInfos([FromQuery] int id)
         {
-            var userinfos = db.users.Where(x => x.Id == id );
+            var userinfos = db.users.Where(x => x.Id == id);
 
             return Ok(new { Status = true, userinfos });
 
@@ -520,7 +601,7 @@ namespace GiftStore.API
         /// <param name="id"></param>
         /// <returns></returns>
         [HttpPost("/UpdateUserInfos")]
-        public IActionResult UpdateUserInfos([FromBody] UpdateUserProfileViewModel mdoel,[FromQuery]int id )
+        public IActionResult UpdateUserInfos([FromBody] UpdateUserProfileViewModel mdoel, [FromQuery] int id)
         {
             var userinfos = db.users.FirstOrDefault(x => x.Id == id);
             if (userinfos == null)
@@ -528,10 +609,10 @@ namespace GiftStore.API
                 return Ok(new { Status = false, message = "کاربری پیدا نشد" });
 
             }
-            userinfos.FirstName=mdoel.FirstName;
-            userinfos.LastName=mdoel.LastName;
-            userinfos.Phone=mdoel.Phone;
-            userinfos.Email=mdoel.Email;
+            userinfos.FirstName = mdoel.FirstName;
+            userinfos.LastName = mdoel.LastName;
+            userinfos.Phone = mdoel.Phone;
+            userinfos.Email = mdoel.Email;
             db.SaveChanges();
 
             return Ok(new { Status = true, userinfos });
@@ -540,29 +621,29 @@ namespace GiftStore.API
 
         }
         [HttpPost("/UpdateUserPass")]
-        public IActionResult UpdateUserPass(string oldpass,string newpas ,[FromQuery] int id)
+        public IActionResult UpdateUserPass(string oldpass, string newpas, [FromQuery] int id)
         {
             var userinfos = db.users.FirstOrDefault(x => x.Id == id);
-            if(userinfos == null)
+            if (userinfos == null)
             {
                 return Ok(new { Status = false, message = "کاربری پیدا نشد" });
 
             }
-        
-            if (userinfos.Password == HashPassword( oldpass))
-            {
-                    userinfos.Password = HashPassword( newpas);
-                db.SaveChanges() 
-                ;
-                    return Ok(new { Status = true, userinfos });
 
-               
+            if (userinfos.Password == HashPassword(oldpass))
+            {
+                userinfos.Password = HashPassword(newpas);
+                db.SaveChanges()
+                ;
+                return Ok(new { Status = true, userinfos });
+
+
 
             }
 
             else
             {
-                return BadRequest(new { Status = false,message="پسورد فعلی اشتباه میباشد", userinfos });
+                return BadRequest(new { Status = false, message = "پسورد فعلی اشتباه میباشد", userinfos });
 
             }
 
@@ -579,5 +660,57 @@ namespace GiftStore.API
         }
 
 
+
+
+
+
+
+
+
+
+
+        [HttpGet("/GetNotifications")]
+        public IActionResult GetNotifications([FromQuery] int userid, int? Status, string? showto)
+        {
+            //اگر پیام همگانی بخاد بببینه 
+            if (showto == "0")
+            {
+                var Notifs = db.notifications.Where(x => (x.showTo == "0")).OrderByDescending(x => x.Id).ToList();
+                return Ok(new { Status = true, Notifs });
+
+            }
+            if (showto == "" + userid)
+            {
+                {
+                    var Notifs = db.notifications.Where(x => (x.showTo == "" + userid) && x.Status == Status).OrderByDescending(x => x.Id).ToList();
+                    return Ok(new { Status = true, Notifs });
+
+                }
+            }
+
+            else
+            {
+                var Notifs = db.notifications.Where(x => (x.showTo == "" + userid||x.showTo=="0") && x.Status == Status).OrderByDescending(x => x.Id).ToList();
+                return Ok(new { Status = true, Notifs });
+
+
+            }
+
+        }
+        [HttpPost("/SeenNotifications")]
+        public IActionResult SeenNotifications( int userid, int NotifID)
+        {
+            var PersonalNotifs = db.notifications.FirstOrDefault(x => x.showTo == "" + userid &&x.Id==NotifID );
+            if (PersonalNotifs == null)
+            {
+                return BadRequest(new { Status = false,message="اعلانی یافت نشد" });
+
+            }
+            PersonalNotifs.Status = 1;
+            db.SaveChanges();   
+            return Ok(new { Status = true, PersonalNotifs});
+
+
+        }
     }
 }

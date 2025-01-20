@@ -2,7 +2,9 @@
 {
     public class SMSRequest
     {
-        public string MobileNumber { get; set; }
-        public string Message { get; set; }
+        public string PhoneNumber { get; set; }
+        public string ?Message { get; set; }
+        public string? TemplateType { get; set; }
+
     }
 }

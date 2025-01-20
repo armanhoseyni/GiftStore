@@ -11,6 +11,7 @@
         public double Price { get; set; }
 
         public DateTime ExpDate { get; set; }
+        public DateTime AddDate { get; set; }
         public string? status { get; set; }
 
     }

@@ -9,11 +9,14 @@ namespace GiftStore.Services
             // Validate input
             if (file == null || file.Length == 0)
             {
-                return "No file uploaded or the file is empty.";
+                return "";
             }
 
-            // Define permitted image extensions
-            string[] permittedExtensions = { ".jpg", ".jpeg", ".png", ".bmp", ".gif" };
+            // Define permitted file extensions
+            string[] permittedExtensions = { ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".mp4", ".mpeg", ".wav" };
+
+            // Define permitted MIME types
+            string[] permittedMimeTypes = { "image/jpeg", "image/png", "image/gif", "video/mp4", "audio/mpeg", "audio/wav" };
 
             // Ensure the provided directory exists
             if (!Directory.Exists(directory))
@@ -26,7 +29,13 @@ namespace GiftStore.Services
 
             if (string.IsNullOrEmpty(ext) || !permittedExtensions.Contains(ext))
             {
-                return $"Invalid file type: {file.FileName}. Only image files are allowed.";
+                return $"Invalid file type: {file.FileName}. Only image, video, and audio files are allowed.";
+            }
+
+            // Validate the MIME type
+            if (!permittedMimeTypes.Contains(file.ContentType.ToLowerInvariant()))
+            {
+                return $"Invalid MIME type: {file.ContentType}. Only image, video, and audio files are allowed.";
             }
 
             // Generate a unique file name
@@ -40,10 +49,10 @@ namespace GiftStore.Services
             }
 
             // Return the file path
-            return filePath;
+            return filePath.Replace("wwwroot\\", "").Replace("wwwroot/", "");
         }
 
-     
+
         public string GetContentType(string filePath)
         {
             string ext = Path.GetExtension(filePath).ToLowerInvariant();

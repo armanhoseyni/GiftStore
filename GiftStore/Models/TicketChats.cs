@@ -13,10 +13,10 @@ namespace GiftStore.Models
 
         public Tickets tickets { get; set; }
 
-        public string message { get; set; }
+        public string? message { get; set; }
        
         public string? DocumentPath { get; set; }
-
+     
        
         public DateTime SendDate { get; set; }
 

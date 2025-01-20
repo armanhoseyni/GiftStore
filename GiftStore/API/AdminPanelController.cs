@@ -13,6 +13,12 @@ using DocumentFormat.OpenXml.InkML;
 using System.Text.Json.Serialization;
 using System.Text.Json;
 using System.Globalization;
+using GiftStore.Migrations;
+using Polly;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 
 
 namespace GiftStore.API
@@ -22,35 +28,39 @@ namespace GiftStore.API
     public class AdminPanelController : ControllerBase
     {
         public Db_API db { get; set; }
-        public AdminPanelController(Db_API db_)
+        private readonly IConfiguration _configuration;
+
+        public AdminPanelController(Db_API db_, IConfiguration configuration)
         {
             db = db_;
+            _configuration = configuration;
         }
         //contact us
         [HttpGet("/GetAllContactUs")]
         public IActionResult GetAllContactUs()
         {
             var Allcontactus = db.contact_Us.ToList();
-           
+
             return Ok(new { Status = true, Allcontactus });
         }
         // Users
         [HttpGet("/GetAllUsers")]
         public IActionResult GetAllUsers()
         {
-            var allUsers = db.users.ToList();
+            var allUsers = db.users
+       .OrderByDescending(u => u.Id) // Replace 'Id' with the field you want to sort by
+       .ToList();
 
-          
-            return Ok(new { Status = true,allUsers });
+            return Ok(new { Status = true, allUsers });
         }
 
 
         [HttpGet("/GetUserWalletLogs")]
         public IActionResult GetUserWalletLogs([FromQuery] int id)
         {
-            var AllTransactions = db.walletLogs.Where(x=>x.UserId==id);
-        
-            return Ok(new {Status=true, AllTransactions });
+            var AllTransactions = db.walletLogs.Where(x => x.UserId == id);
+
+            return Ok(new { Status = true, AllTransactions });
 
 
         }
@@ -59,7 +69,7 @@ namespace GiftStore.API
         public IActionResult GetAllUsersCounts()
         {
             var allusers = db.users.Where(x => x.Role == "User").ToList();
-         
+
             return Ok(new { Status = true, count = allusers.Count });
         }
 
@@ -85,7 +95,7 @@ namespace GiftStore.API
                 Password = model.Password,
                 RePassword = model.RePassword,
                 Email = model.Email,
-                RegisterDate = DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss"),
+                RegisterDate = DateTime.Now,
                 Active = true,
                 Stars = 0,
                 wallet = 0,
@@ -94,22 +104,22 @@ namespace GiftStore.API
 
             db.users.Add(user);
             db.SaveChanges();
-            
-                return Ok(new { Status = true, message = "User added successfully.", User = user });
 
-         
+            return Ok(new { Status = true, message = "User added successfully.", User = user });
+
+
 
         }
 
         [HttpPost("/UpdateUser")]
         public IActionResult UpdateUser([FromBody] UpdateUserViewModel model, [FromQuery] string Phone)
         {
-            var user = db.users.FirstOrDefault(u => u.Phone ==Phone);
+            var user = db.users.FirstOrDefault(u => u.Phone == Phone);
 
             if (user == null)
                 return BadRequest(new { Status = false, message = "User not found", user });
 
-         
+
             if (!string.IsNullOrWhiteSpace(model.FirstName))
                 user.FirstName = model.FirstName;
 
@@ -122,7 +132,7 @@ namespace GiftStore.API
             if (!string.IsNullOrWhiteSpace(model.Role))
                 user.Role = model.Role;
 
-            
+
             db.SaveChanges();
 
             return Ok(new { Status = true, message = "User updated successfully.", User = user });
@@ -143,32 +153,36 @@ namespace GiftStore.API
         public IActionResult GetUserById([FromQuery] int id)
         {
             var user = db.users.FirstOrDefault(u => u.Id == id);
-          
+
             return Ok(new { Status = true, user });
         }
 
         [HttpGet("/SearchUsersByPhone")]
         public IActionResult SearchUsersByPhone([FromQuery] string? phone)
         {
-            if (string.IsNullOrEmpty(phone))
+            // Start with the base query
+            var query = db.users.AsQueryable();
+
+            // Apply phone filter if phone is provided
+            if (!string.IsNullOrEmpty(phone))
             {
-                var usersall = db.users.ToList();
-
-                return Ok(new { Status = true, usersall });
-
-
+                query = query.Where(u => u.Phone.Contains(phone));
             }
-            var users = db.users.Where(u => u.Phone.Contains(phone)).ToList();
-          
+
+            // Order the results by Id in descending order
+            query = query.OrderByDescending(u => u.Id);
+
+            // Execute the query and get the results
+            var users = query.ToList();
+
+            // Return the results
             return Ok(new { Status = true, users });
-
         }
-
         [HttpGet("/CheckUserExists")]
         public IActionResult CheckUserExists([FromQuery] string phone)
         {
             var exists = db.users.Any(u => u.Phone == phone);
-            
+
             return Ok(new { Status = true, Exists = exists, StatusCode = 200 });
         }
 
@@ -207,7 +221,7 @@ namespace GiftStore.API
         public IActionResult ShowRespons([FromQuery] int id)
         {
             var ResponsesTickets = db.tickets.Where(x => x.UserId == id && x.Status == "پاسخ داده شده").ToList();
-           
+
             return Ok(new { Status = true, ResponsesTickets });
         }
 
@@ -215,7 +229,7 @@ namespace GiftStore.API
         public IActionResult ShowAllUsersTickets([FromQuery] int id)
         {
             var ResponsesTickets = db.tickets.Where(x => x.UserId == id).ToList();
-           
+
             return Ok(new { Status = true, ResponsesTickets });
         }
 
@@ -371,12 +385,12 @@ namespace GiftStore.API
         {
             if (file == null || file.Length == 0)
             {
-                return BadRequest(new { Status=false,message = "No file uploaded." });
+                return BadRequest(new { Status = false, message = "No file uploaded." });
             }
 
             if (Path.GetExtension(file.FileName).ToLower() != ".xlsx")
             {
-                return BadRequest(new {Status=false ,message = "Invalid file format. Please upload an Excel file." });
+                return BadRequest(new { Status = false, message = "Invalid file format. Please upload an Excel file." });
             }
 
             try
@@ -389,7 +403,7 @@ namespace GiftStore.API
                         var worksheet = package.Workbook.Worksheets[0];
                         if (worksheet.Dimension == null)
                         {
-                            return Ok(new { Status=true,message = "The Excel file is empty." });
+                            return Ok(new { Status = true, message = "The Excel file is empty." });
                         }
 
                         var rowCount = worksheet.Dimension.Rows;
@@ -399,7 +413,8 @@ namespace GiftStore.API
                             .Select(c => c.Text.Trim())
                             .ToList();
 
-                        var requiredHeaders = new List<string> { "Code", "Country", "type", "Price", "ExpDate", "status" };
+                        // Add "addDate" to the list of required headers
+                        var requiredHeaders = new List<string> { "Code", "Country", "type", "Price", "ExpDate", "status", "addDate" };
                         if (!requiredHeaders.All(h => headers.Contains(h)))
                         {
                             return Ok(new { message = "Invalid Excel file format. Required columns are missing." });
@@ -414,6 +429,7 @@ namespace GiftStore.API
                             var price = Convert.ToDouble(worksheet.Cells[row, headers.IndexOf("Price") + 1].Text.Trim());
                             var expDate = Convert.ToDateTime(worksheet.Cells[row, headers.IndexOf("ExpDate") + 1].Text.Trim());
                             var status = worksheet.Cells[row, headers.IndexOf("status") + 1].Text.Trim();
+                            var addDate = Convert.ToDateTime(worksheet.Cells[row, headers.IndexOf("addDate") + 1].Text.Trim());
 
                             // Encrypt the code
                             InfoSec en = new InfoSec();
@@ -437,7 +453,8 @@ namespace GiftStore.API
                                 type = type,
                                 Price = price,
                                 ExpDate = expDate,
-                                Status = status
+                                Status = status,
+                                AddDate = addDate // Add the new field
                             };
 
                             db.giftCards.Add(newCard);
@@ -465,12 +482,11 @@ namespace GiftStore.API
                 return StatusCode(500, new { message = "Error importing gift cards", error = ex.Message });
             }
         }
-
         private void SaveToExcel(int id, string label, string result, string key, string ivKey, string directory)
         {
-            string directoryPath = Path.GetDirectoryName(directory);
-            string fileName = Path.GetFileName(directory);
-            string filePath = Path.Combine(directoryPath, fileName);
+            string directoryPath = directory; // Treat 'directory' as a directory path
+            string fileName = "GiftCards.xlsx"; // Use a fixed file name
+            string filePath = Path.Combine(directoryPath, fileName); // Combine directory and file name
 
             if (!Directory.Exists(directoryPath))
             {
@@ -494,6 +510,7 @@ namespace GiftStore.API
                 worksheet.Cell(1, 3).Value = "Result";
                 worksheet.Cell(1, 4).Value = "Key";
                 worksheet.Cell(1, 5).Value = "IVKey";
+                worksheet.Cell(1, 6).Value = "AddDate"; // Add the new column header
             }
 
             int lastRow = worksheet.LastRowUsed()?.RowNumber() ?? 1;
@@ -504,11 +521,10 @@ namespace GiftStore.API
             worksheet.Cell(newRow, 3).Value = result;
             worksheet.Cell(newRow, 4).Value = key;
             worksheet.Cell(newRow, 5).Value = ivKey;
+            worksheet.Cell(newRow, 6).Value = DateTime.Now.ToString("yyyy-MM-dd"); // Add the current date
 
             workbook.SaveAs(filePath);
         }
-        
-
         [HttpPost("/AddGiftCart")]
         public IActionResult AddGiftCart([FromBody] AddCardViewModel model)
         {
@@ -531,25 +547,26 @@ namespace GiftStore.API
                 type = model.type,
                 Price = model.Price,
                 ExpDate = model.ExpDate,
+                AddDate = model.AddDate,
                 Status = model.status
             };
 
             db.giftCards.Add(newCard);
             db.SaveChanges();
-            
-                string directory = @"wwwroot/GiftCards/GiftCards.xlsx";
-                SaveToExcel1(newCard.Id, randomdigit, result, Key, IVKey, directory);
 
-                string filePath = @"wwwroot/GiftCards/GiftCards.xlsx";
-                if (System.IO.File.Exists(filePath))
-                {
-                    byte[] fileBytes = System.IO.File.ReadAllBytes(filePath);
-                    return File(fileBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "GiftCards.xlsx");
-                }
+            string directory = @"wwwroot/GiftCards/GiftCards.xlsx";
+            SaveToExcel1(newCard.Id, randomdigit, result, Key, IVKey, directory);
 
-                return Ok(new { Status = true, newCard, message = "کارت با موفقیت ثبت شد", StatusCode = 200 });
-          
-            
+            string filePath = @"wwwroot/GiftCards/GiftCards.xlsx";
+            if (System.IO.File.Exists(filePath))
+            {
+                byte[] fileBytes = System.IO.File.ReadAllBytes(filePath);
+                return File(fileBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "GiftCards.xlsx");
+            }
+
+            return Ok(new { Status = true, newCard, message = "کارت با موفقیت ثبت شد", StatusCode = 200 });
+
+
         }
 
         private void SaveToExcel1(int id, string label, string result, string key, string ivKey, string directory)
@@ -640,7 +657,7 @@ namespace GiftStore.API
             {
                 return StatusCode(500, new { Status = true, message = "Error decrypting the code: " + ex.Message, StatusCode = 500 });
             }
-            var selectedgiftcard = db.giftCards.Where(x => x.label ==label).FirstOrDefault();
+            var selectedgiftcard = db.giftCards.Where(x => x.label == label).FirstOrDefault();
 
             var giftCard = new
             {
@@ -653,12 +670,14 @@ namespace GiftStore.API
                 DecryptedCode = decryptedCode,
                 Code = giftCardInfo.Key,
                 IVKey = giftCardInfo.IVKey
+                , AddDate = selectedgiftcard.AddDate,
+                ExpDate = selectedgiftcard.ExpDate
             };
 
             return Ok(new
             {
                 giftCard,
-            Status=true,
+                Status = true,
 
 
             });
@@ -668,16 +687,42 @@ namespace GiftStore.API
         [HttpGet("/GetAllGiftCards")]
         public IActionResult GetAllGiftCards()
         {
-            List<GiftCards> allgiftcards = db.giftCards.ToList();
-           
+            var allgiftcards = db.giftCards.OrderByDescending(u => u.Id).ToList();
+
             return Ok(new { Status = true, allgiftcards });
+        }
+        [HttpGet("minmaxprice")]
+        public IActionResult GetMinMaxPrice()
+        {
+            var minPrice = db.giftCards.Min(g => g.Price);
+            var maxPrice = db.giftCards.Max(g => g.Price);
+
+            var result = new
+            {
+                MinPrice = minPrice,
+                MaxPrice = maxPrice
+            };
+
+            return Ok(result);
         }
 
         [HttpGet("/SearchGift")]
-        public IActionResult SearchGift([FromQuery] string? status, [FromQuery] string? country, [FromQuery] string? type)
+        public IActionResult SearchGift([FromQuery] string? status, [FromQuery] string? country, [FromQuery] string? type, [FromQuery] double minPrice, [FromQuery] double maxPrice)
         {
+            // Validate the price range before querying the database
+            if (minPrice < 0 || maxPrice < 0 || minPrice > maxPrice)
+            {
+                return BadRequest(new
+                {
+                    Status = false,
+                    Message = "Invalid price range. Ensure minPrice is less than or equal to maxPrice and both are non-negative."
+                });
+            }
+
+            // Start with the base query
             var query = db.giftCards.AsQueryable();
 
+            // Apply filters if they are provided
             if (!string.IsNullOrEmpty(status))
                 query = query.Where(u => u.Status == status);
 
@@ -686,12 +731,40 @@ namespace GiftStore.API
 
             if (!string.IsNullOrEmpty(type))
                 query = query.Where(u => u.type == type);
+            if (!string.IsNullOrEmpty("" + maxPrice))
+            {
+                // minPrice = db.giftCards.Min(g => g.Price);
+                maxPrice = db.giftCards.Max(g => g.Price);
 
-            var giftcards = query.ToList();
-           
-            return Ok(new { Status = true, giftcards });
+
+            }
+            if (string.IsNullOrEmpty("" + minPrice))
+            {
+                //  minPrice = db.giftCards.Min(g => g.Price);
+                minPrice = db.giftCards.Max(g => g.Price);
+
+            }
+            query = query.Where(g => g.Price >= minPrice && g.Price <= maxPrice).OrderByDescending(u => u.Id);
+
+            // Apply price range filter
+
+            // Select the required fields and execute the query
+            var giftCards = query
+                .Select(g => new
+                {
+                    g.Code,
+                    g.Country,
+                    g.ExpDate,
+                    g.Price,
+                    g.Status,
+                    g.label,
+                    g.type
+                })
+                .ToList();
+
+            // Return the filtered gift cards
+            return Ok(new { Status = true, giftCards });
         }
-
         [HttpPost("/DeleteGiftCard")]
         public IActionResult DeleteGiftCard([FromQuery] string label)
         {
@@ -703,10 +776,10 @@ namespace GiftStore.API
             {
                 db.giftCards.Remove(Gc);
                 db.SaveChanges();
-                   // return Ok(new { Status = true, newlog, message = "امتیازات این کاربر اضافه شد" });
+                // return Ok(new { Status = true, newlog, message = "امتیازات این کاربر اضافه شد" });
                 return Ok(new { Status = true, message = "گیفت کارت با موفقیت حذف شد" });
 
-               
+
 
 
             }
@@ -766,17 +839,18 @@ namespace GiftStore.API
             giftcard.type = model.type;
             giftcard.Price = model.Price;
             giftcard.ExpDate = model.ExpDate;
+            giftcard.AddDate = model.AddDate;
             giftcard.Status = model.status;
 
-           db.SaveChanges() ;
-                string directory = @"wwwroot/GiftCards/GiftCards.xlsx";
-                UpdateExcel(label, encryptedCode, newKey, IVkey, directory);
-                return Ok(new { Status = true, message = "اطلاعات با موفقیت بروزرسانی شد", StatusCode = 200 });
-              
-         
+            db.SaveChanges();
+            string directory = @"wwwroot/GiftCards/GiftCards.xlsx";
+            UpdateExcel(label, encryptedCode, newKey, IVkey, directory);
+            return Ok(new { Status = true, message = "اطلاعات با موفقیت بروزرسانی شد", StatusCode = 200 });
 
 
-          
+
+
+
 
         }
 
@@ -819,7 +893,7 @@ namespace GiftStore.API
         public IActionResult SoldGiftsCount()
         {
             var soldgiftcards = db.giftCards.Where(u => u.Status == "فروخته شده").ToList().Count();
-         
+
             return Ok(new { Status = true, soldgiftcards });
         }
 
@@ -853,7 +927,7 @@ namespace GiftStore.API
         {
 
             var tickets = db.tickets.Where(t => t.UserId == id).ToList();
-           
+
             return Ok(new { Status = true, tickets });
         }
         [HttpGet("/ShowUserTicketChats")]
@@ -865,17 +939,22 @@ namespace GiftStore.API
                 .Select(t => new
                 {
                     Message = t.message,
+                    Image = t.DocumentPath,
                     Sender = t.Sender,
                     SendDate = t.SendDate
                 })
                 .ToList();
 
             // Retrieve the ticket status
-            var ticketStatus = db.tickets
+            var ticketStatus1 = db.tickets
                 .Where(t => t.Id == id)
                 .Select(t => t.Status)
                 .FirstOrDefault(); // Use FirstOrDefault to get a single value
-
+            var ticketStatus = true;
+            if (ticketStatus1 == "بسته شده")
+            {
+                ticketStatus = false;
+            }
             // Retrieve the user associated with the ticket
             var user = db.tickets
                 .Where(t => t.Id == id)
@@ -897,20 +976,20 @@ namespace GiftStore.API
             var user = db.tickets.FirstOrDefault(t => t.Id == id);
             if (user == null)
             {
-                return Ok(new { Status = true,user, message = "چنین تیکتی موجود نمیباشد", StatusCode = 200 });
+                return Ok(new { Status = true, user, message = "چنین تیکتی موجود نمیباشد", StatusCode = 200 });
             }
 
             string filePath = db.tickets.FirstOrDefault(x => x.Id == id).DocumentPath;
             if (filePath == null)
             {
-                return Ok(new { Status = true,filePath, message = "فایلی موجود نمیباشد", StatusCode = 200 });
+                return Ok(new { Status = true, filePath, message = "فایلی موجود نمیباشد", StatusCode = 200 });
             }
 
-            
 
-          //string contentType = GetContentType(filePath);
+
+            //string contentType = GetContentType(filePath);
             //var fileStream = System.IO.File.OpenRead(filePath);
-            return Ok(new {File=filePath});
+            return Ok(new { File = filePath });
         }
 
         private string GetContentType(string filePath)
@@ -933,7 +1012,7 @@ namespace GiftStore.API
         public IActionResult GetAllTickets()
         {
             var tickets = db.tickets.ToList();
-           
+
             return Ok(new { Status = true, tickets });
         }
 
@@ -941,7 +1020,7 @@ namespace GiftStore.API
         public IActionResult GetAllTicketsByImportance()
         {
             var tickets = db.tickets.OrderByDescending(t => t.Importance).ToList();
-          
+
             return Ok(new { Status = true, tickets });
         }
 
@@ -949,7 +1028,7 @@ namespace GiftStore.API
         public IActionResult GetAllTicketsByStatus([FromQuery] string status)
         {
             var tickets = db.tickets.Where(t => t.Status == status).ToList();
-          
+
             return Ok(new { Status = true, tickets });
         }
 
@@ -965,16 +1044,20 @@ namespace GiftStore.API
 
             }
 
-            var tickets = db.tickets.Where(t => t.Title .Contains( status)).ToList();
+            var tickets = db.tickets.Where(t => t.Title.Contains(status)).ToList();
 
             return Ok(new { Status = true, tickets });
         }
         [HttpPost("/SendResponeToTickets")]
-        public IActionResult SendResponeToTickets([FromQuery] int id, [FromBody] ViewModelResponseToTickets model )
+        public IActionResult SendResponeToTickets([FromQuery] int id, ViewModelResponseToTickets model)
         {
-            
+            string filePath = @"wwwroot\Documents";
+
+            Services.Documents documentsService = new Services.Documents();
+            string documentPath = documentsService.UploadFile(model.Document, filePath);
+
             var chat = db.tickets.FirstOrDefault(u => u.Id == id);
-            if(chat.Status!="بسته شده")
+            if (chat.Status != "بسته شده")
             {
                 if (chat == null)
                 {
@@ -986,11 +1069,20 @@ namespace GiftStore.API
                 newRes.SendDate = DateTime.Now;
                 newRes.message = model.Response;
                 newRes.TicketId = id;
+                if (!string.IsNullOrEmpty(documentPath))
+                {
+                    newRes.DocumentPath = documentPath;
+                }
+                else
+                {
+                    newRes.DocumentPath = null;
+                }
+
                 db.ticketChats.Add(newRes);
                 db.SaveChanges();
-                    return Ok(new { Status = true, message = "تیکت با موفقیت پاسخ داده شد", chat });
+                return Ok(new { Status = true, message = "تیکت با موفقیت پاسخ داده شد", newRes });
 
-               
+
 
 
             }
@@ -1011,21 +1103,21 @@ namespace GiftStore.API
             }
 
             ticket.Status = "بسته شده";
-            db.SaveChanges() ;
-                return Ok(new { Status = true, message = "تیکت با موفقیت پاسخ داده شد", ticket });
-         
+            db.SaveChanges();
+            return Ok(new { Status = true, message = "تیکت با موفقیت پاسخ داده شد", ticket });
 
-           
+
+
         }
 
 
-      
+
         /////telegram stars
         ///
         [HttpPost("/AddMinStars")]
         public IActionResult AddMinStars([FromQuery] int stars)
         {
-            if(stars > 0)
+            if (stars > 0)
             {
                 var model = new TelegramStars
                 {
@@ -1035,14 +1127,14 @@ namespace GiftStore.API
 
                 db.telegramStars.Add(model);
                 db.SaveChanges();
-                    return Ok(new { Status = true, model});
+                return Ok(new { Status = true, model });
 
-               
+
 
             }
             else
             {
-                return BadRequest(new { Status = false,message="ستاره نمیتواند کمتر از صفر باشد" });
+                return BadRequest(new { Status = false, message = "ستاره نمیتواند کمتر از صفر باشد" });
 
 
             }
@@ -1058,7 +1150,7 @@ namespace GiftStore.API
 .FirstOrDefault(); // Get the first row (which has the highest Id)
             var minStars = lastRow.MinStars;
 
-           return Ok(new { minStars, Status = true });
+            return Ok(new { minStars, Status = true });
 
 
         }
@@ -1076,7 +1168,7 @@ namespace GiftStore.API
 
                 db.telegramStars.Add(model);
                 db.SaveChanges();
-                    return Ok(new { Status = true, model});
+                return Ok(new { Status = true, model });
 
             }
             else
@@ -1094,20 +1186,55 @@ namespace GiftStore.API
 .FirstOrDefault(); // Get the first row (which has the highest Id)
             var minStars = lastRow.StarsPerADollar;
 
-            return Ok(new {  minStars, Status = true });
+            return Ok(new { minStars, Status = true });
 
 
         }
+        [HttpGet("/GetAllUsersRequests")]
+        public IActionResult GetAllUsersRequests()
+        {
+            // گروه‌بندی درخواست‌ها بر اساس UserId و انتخاب آخرین درخواست هر گروه
+            var uniqueRequests = db.userStarsLogs
+                .Where(x => x.Status == "Waiting") // فقط درخواست‌های با وضعیت "Waiting"
+                .GroupBy(x => x.UserId) // گروه‌بندی بر اساس UserId
+                .Select(g => g.OrderByDescending(x => x.LogDate).First()) // انتخاب آخرین درخواست هر گروه
+                .ToList();
+
+            return Ok(new { Status = true, requests = uniqueRequests });
+        }
+
+
+        [HttpPost("/RejectRequest")]
+        public IActionResult RejectRequest([FromQuery] int reqid)
+        {
+
+            var UserRequest = db.userStarsLogs.Where(x => x.Id == reqid && x.Status == "Waiting").FirstOrDefault();
+            if (UserRequest == null)
+            {
+                return Ok(new { Status = false, message = "درخاستی از طرف این کاربر یافت نشد" });
+            }
+            else
+            {
+
+
+
+                UserRequest.Status = "rejected";
+                db.SaveChanges();
+                return Ok(new { Status = true, UserRequest });
 
 
 
 
+
+            }
+
+        }
 
         [HttpPost("/removeStars")]
-        public IActionResult removeStars([FromQuery] int id)
+        public IActionResult removeStars([FromQuery] int reqid)
         {
-            
-        var UserRequest=db.userStarsLogs.Where(x=>x.UserId == id &&x.Status=="Waiting").FirstOrDefault();
+
+            var UserRequest = db.userStarsLogs.Where(x => x.Id == reqid && x.Status == "Waiting").FirstOrDefault();
             if (UserRequest == null)
             {
                 return Ok(new { Status = false, message = "درخاستی از طرف این کاربر یافت نشد" });
@@ -1119,19 +1246,19 @@ namespace GiftStore.API
     .FirstOrDefault(); // Get the first row (which has the highest Id)
                 var minStars = lastRow.MinStars;
 
-               
-                    var user = db.users.FirstOrDefault(x => x.Id == id);
-                    user.Stars = 0;
-                    UserRequest.Status = "success";
+
+                var user = db.users.FirstOrDefault(x => x.Id == UserRequest.UserId);
+                user.Stars = 0;
+                UserRequest.Status = "success";
                 db.SaveChanges();
-                        return Ok(new { Status = true, user});
+                return Ok(new { Status = true, user });
 
-                    
 
-                
-               
+
+
+
             }
-        
+
         }
         [HttpPost("/DeleteStars")]
         public IActionResult DeleteStars([FromQuery] int id, [FromQuery] int stars)
@@ -1161,10 +1288,10 @@ namespace GiftStore.API
 
                 db.userStarsLogs.Add(newlog);
 
-               db.SaveChanges() ;
-                    return Ok(new { Status = true, user, message = "امتیازات این کاربر کم شد شد" });
+                db.SaveChanges();
+                return Ok(new { Status = true, user, message = "امتیازات این کاربر کم شد شد" });
 
-              
+
             }
 
 
@@ -1203,10 +1330,10 @@ namespace GiftStore.API
 
                 db.userStarsLogs.Add(newlog);
 
-              db.SaveChanges() ;
-                    return Ok(new { Status = true, user, message = "امتیازات این کاربر اضافه شد" });
+                db.SaveChanges();
+                return Ok(new { Status = true, user, message = "امتیازات این کاربر اضافه شد" });
 
-              
+
             }
 
 
@@ -1232,7 +1359,7 @@ namespace GiftStore.API
         [HttpGet("/GetAllRequestsAdmin")]
         public IActionResult GetAllRequests()
         {
-            var reqs = db.userStarsLogs.Where(x => x.Status == "Waiting").ToList();
+            var reqs = db.userStarsLogs.Where(x => x.Status == "Waiting").OrderByDescending(u => u.Id).ToList();
             return Ok(new { reqs, Status = true });
 
 
@@ -1251,7 +1378,7 @@ namespace GiftStore.API
             var factors = db.factors
                   .Include(f => f.GiftCard) // Include the GiftCard navigation property
                   .Include(f => f.User) // Include the User navigation property
-                   // Filter factors with Status == true
+                                        // Filter factors with Status == true
                   .Select(f => new
                   {
                       // Fields from the Factors table
@@ -1268,6 +1395,7 @@ namespace GiftStore.API
                       // Price from the GiftCards table (handle null GiftCard)
                       GiftCardPrice = f.GiftCard != null ? f.GiftCard.Price : (double?)null
                   })
+                  .OrderByDescending(u => u.FactorId)
                   .ToList();
 
             return Ok(new { factors, Status = true }); // Return the filtered list of factors
@@ -1279,7 +1407,7 @@ namespace GiftStore.API
             var factors = db.factors
                     .Include(f => f.GiftCard) // Include the GiftCard navigation property
                     .Include(f => f.User) // Include the User navigation property
-                    .Where(f => f.Status == true) // Filter factors with Status == true
+                    .Where(f => f.Status == "success") // Filter factors with Status == true
                     .Select(f => new
                     {
                         // Fields from the Factors table
@@ -1311,7 +1439,7 @@ namespace GiftStore.API
             var factors = db.factors
                 .Include(f => f.GiftCard) // Include the GiftCard navigation property
                 .Include(f => f.User) // Include the User navigation property
-                .Where(f => f.Status == true) // Filter factors with Status == true
+                .Where(f => f.Status == "success") // Filter factors with Status == true
                 .Select(f => new
                 {
                     // Fields from the Factors table
@@ -1334,94 +1462,32 @@ namespace GiftStore.API
         }
 
 
-        [HttpGet("/SearchInAllFactorsByName")]
-        public IActionResult SearchInAllFactorsByName([FromQuery]string? name )
-        {
-            if (string.IsNullOrEmpty(name))
-            {
-                var factors1 = db.factors
-            .Include(f => f.GiftCard) // Include the GiftCard navigation property
-            .Include(f => f.User) // Include the User navigation property
-             // Filter factors with Status == true
-            .Select(f => new
-            {
-                // Fields from the Factors table
-                FactorId = f.Id,
-                UserId = f.UserId,
-                FactorDate = f.FactorDate,
-                GiftId = f.GiftId,
-                Status = f.Status,
-                Type = f.Type,
-                TransActionNumber = f.TransActionNumber,
-                factorPrice = f.GiftCard.Price,
-                // Combine FirstName and LastName from the User navigation property
-                Username = f.User != null ? $"{f.User.FirstName} {f.User.LastName}" : "Unknown User",
-                // Price from the GiftCards table (handle null GiftCard)
-                GiftCardPrice = f.GiftCard != null ? f.GiftCard.Price : (double?)null
-            })
-            .ToList();
-                return Ok(new { factors1, Status = true }); // Return the filtered list of factors
 
-            }
-            var factors = db.factors
-                .Include(f => f.GiftCard) // Include the GiftCard navigation property
-                .Include(f => f.User) // Include the User navigation property
-                .Where(f => f.UserName.Contains( name )) // Filter factors with Status == true
-                .Select(f => new
-                {
-                    // Fields from the Factors table
-                    FactorId = f.Id,
-                    UserId = f.UserId,
-                    FactorDate = f.FactorDate,
-                    GiftId = f.GiftId,
-                    Status = f.Status,
-                    Type = f.Type,
-                    TransActionNumber = f.TransActionNumber,
-                    factorPrice = f.GiftCard.Price,
-                    // Combine FirstName and LastName from the User navigation property
-                    Username = f.User != null ? $"{f.User.FirstName} {f.User.LastName}" : "Unknown User",
-                    // Price from the GiftCards table (handle null GiftCard)
-                    GiftCardPrice = f.GiftCard != null ? f.GiftCard.Price : (double?)null
-                })
-                .ToList();
-
-            return Ok(new { factors, Status = true }); // Return the filtered list of factors
-        }
         [HttpGet("/SearchInFailFactorsByName")]
-        public IActionResult SearchInFailFactorsByName([FromQuery] string? name, [FromQuery] bool status)
+        public IActionResult SearchInFailFactorsByName(
+       [FromQuery] string? name,
+       [FromQuery] string? status) // Make status optional
         {
-            
-            if (string.IsNullOrEmpty(name))
-            {
-               var  factorsfull = db.factors
-            .Include(f => f.GiftCard) // Include the GiftCard navigation property
-            .Include(f => f.User). // Include the User navigation property
-                        Where(c=>c.Status==status)          // Filter factors with Status == true
-            .Select(f => new
-            {
-                // Fields from the Factors table
-                FactorId = f.Id,
-                UserId = f.UserId,
-                FactorDate = f.FactorDate,
-                GiftId = f.GiftId,
-                Status = f.Status,
-                Type = f.Type,
-                TransActionNumber = f.TransActionNumber,
-                factorPrice = f.GiftCard.Price,
-                // Combine FirstName and LastName from the User navigation property
-                Username = f.User != null ? $"{f.User.FirstName} {f.User.LastName}" : "Unknown User",
-                // Price from the GiftCards table (handle null GiftCard)
-                GiftCardPrice = f.GiftCard != null ? f.GiftCard.Price : (double?)null
-            })
-            .ToList();
-                return Ok(new { factorsfull, Status = true }); // Return the filtered list of factors
-
-            }
-
-            var factors = db.factors
+            // Start with the base query
+            var query = db.factors
                 .Include(f => f.GiftCard) // Include the GiftCard navigation property
                 .Include(f => f.User) // Include the User navigation property
-                .Where(f => f.UserName.Contains(name)&&f.Status==status) // Filter factors with Status == true
+                .AsQueryable();
+
+            // Apply name filter if name is provided
+            if (!string.IsNullOrEmpty(name))
+            {
+                query = query.Where(f => f.UserName.Contains(name));
+            }
+
+            // Apply status filter if status is provided
+            if (!string.IsNullOrEmpty(status))
+            {
+                query = query.Where(f => f.Status == status);
+            }
+
+            // Select the required fields and execute the query
+            var factors = query
                 .Select(f => new
                 {
                     // Fields from the Factors table
@@ -1432,7 +1498,7 @@ namespace GiftStore.API
                     Status = f.Status,
                     Type = f.Type,
                     TransActionNumber = f.TransActionNumber,
-                    factorPrice = f.GiftCard.Price,
+                    FactorPrice = f.GiftCard.Price,
                     // Combine FirstName and LastName from the User navigation property
                     Username = f.User != null ? $"{f.User.FirstName} {f.User.LastName}" : "Unknown User",
                     // Price from the GiftCards table (handle null GiftCard)
@@ -1440,17 +1506,35 @@ namespace GiftStore.API
                 })
                 .ToList();
 
-            return Ok(new { factors, Status = true }); // Return the filtered list of factors
+            // Check if any factors match the criteria
+            if (factors == null || !factors.Any())
+            {
+                return Ok(new
+                {
+                    Status = true,
+                    Message = "No factors found matching the specified criteria.",
+                    factors = new List<object>() // Return an empty list
+                });
+            }
+
+            // Return the filtered factors
+            return Ok(new { factors, Status = true });
         }
 
 
-
-        [HttpGet("sum-payments")]
-        public IActionResult SumPayments()
+        [HttpGet("/GetSummary")]
+        public IActionResult GetSummary()
         {
             DateTime now = DateTime.Now;
+            DateTime startOfToday = now.Date; // Start of the current day (midnight)
             DateTime startOfLastWeek = now.AddDays(-7);
             DateTime startOfLastMonth = now.AddMonths(-1);
+            DateTime startOfLastMonthRegistration = now.AddMonths(-1).Date; // Start of last month
+
+            // Calculate sums
+            double sumToday = db.factors
+                .Where(f => f.FactorDate >= startOfToday && f.FactorDate <= now)
+                .Sum(f => f.GiftCard.Price);
 
             double sumLastWeek = db.factors
                 .Where(f => f.FactorDate >= startOfLastWeek && f.FactorDate <= now)
@@ -1460,16 +1544,70 @@ namespace GiftStore.API
                 .Where(f => f.FactorDate >= startOfLastMonth && f.FactorDate <= now)
                 .Sum(f => f.GiftCard.Price);
 
+            // Count users with no email address
+            int usersWithNoEmailCount = db.users
+                .Count(u => string.IsNullOrEmpty(u.Email)); // Assuming Email is a string column
+
+            // Count users with an email address
+            int usersWithEmailCount = db.users
+                .Count(u => !string.IsNullOrEmpty(u.Email)); // Users with a non-empty email
+
+            // Count users who registered last month
+            int usersRegisteredLastMonthCount = db.users
+                .Where(u => u.RegisterDate >= startOfLastMonthRegistration && u.RegisterDate < startOfLastMonthRegistration.AddMonths(1))
+                .Count();
+
+            // Sum of FactorPrice for factors with Status == true
+            int CountOfsuccessFactors = db.factors
+                .Where(f => f.Status == "success")
+                .Count(); // Use 0 if FactorPrice is null
+            int CountOfUnsuccessFactors = db.factors
+               .Where(f => f.Status != "success")
+               .Count(); // Use 0 if FactorPrice is null
+
+            // Get the country with the highest sales
+            var countrySales = db.factors
+                .GroupBy(f => f.GiftCard.Country)
+                .Select(g => new
+                {
+                    Country = g.Key,
+                    TotalSales = g.Sum(f => f.GiftCard.Price)
+                })
+                .OrderByDescending(g => g.TotalSales)
+                .FirstOrDefault();
+
+            // Get the type of gift card with the highest sales
+            var typeSales = db.factors
+                .GroupBy(f => f.GiftCard.type)
+                .Select(g => new
+                {
+                    Type = g.Key,
+                    TotalSales = g.Sum(f => f.GiftCard.Price)
+                })
+                .OrderByDescending(g => g.TotalSales)
+                .FirstOrDefault();
+
             return Ok(new
             {
                 Status = true,
+                SumToday = sumToday,
                 SumLastWeek = sumLastWeek,
-                SumLastMonth = sumLastMonth
+                SumLastMonth = sumLastMonth,
+                UsersWithNoEmailCount = usersWithNoEmailCount,
+                UsersWithEmailCount = usersWithEmailCount,
+                UsersRegisteredLastMonthCount = usersRegisteredLastMonthCount,
+                CountFactorsWithTrueStatus = CountOfsuccessFactors, // Updated to sum instead of count
+                CountFactorsWithFalseStatus = CountOfUnsuccessFactors, // Updated to sum instead of count
+                TopSellingCountry = countrySales?.Country ?? "No data",
+                TopSellingCountrySales = countrySales?.TotalSales ?? 0,
+                TopSellingType = typeSales?.Type ?? "No data",
+                TopSellingTypeSales = typeSales?.TotalSales ?? 0
             });
         }
 
-        [HttpGet("/GetIncomeData")]
-        public IActionResult GetIncomeData()
+
+        [HttpGet("/GetCharts")]
+        public IActionResult GetCharts()
         {
             // Get the current year
             int currentYear = DateTime.Now.Year;
@@ -1527,8 +1665,8 @@ namespace GiftStore.API
         public IActionResult GetActivitylogs()
         {
 
-            var logs=db.activityLogs.ToList();
-            return Ok(new {Status=true,Logs=logs});
+            var logs = db.activityLogs.OrderByDescending(u => u.Id).ToList();
+            return Ok(new { Status = true, Logs = logs });
 
         }
 
@@ -1541,13 +1679,13 @@ namespace GiftStore.API
                 Description = model.Description,
                 LogDate = DateTime.Now,
                 UserRole = db.users.Where(x => x.Id == model.UserId).Select(x => x.Role).FirstOrDefault(),
-                Name= db.users.Where(x => x.Id == model.UserId).Select(x => x.LastName).FirstOrDefault()+ db.users.Where(x => x.Id == model.UserId).Select(x => x.LastName).FirstOrDefault()
+                Name = db.users.Where(x => x.Id == model.UserId).Select(x => x.LastName).FirstOrDefault() + db.users.Where(x => x.Id == model.UserId).Select(x => x.LastName).FirstOrDefault()
             };
             db.activityLogs.Add(newlog);
-           db.SaveChanges();
-            
-                return Ok(new {Status=true,newlog});
-           
+            db.SaveChanges();
+
+            return Ok(new { Status = true, newlog });
+
 
         }
 
@@ -1556,10 +1694,409 @@ namespace GiftStore.API
         public IActionResult GetActivitylogsEnterExit()
         {
 
-            var logs = db.activityLogs.Where(x=>x.Description=="ورود"||x.Description=="خروج").ToList();
+            var logs = db.activityLogs.Where(x => x.Description == "ورود" || x.Description == "خروج").ToList();
             return Ok(new { Status = true, Logs = logs });
 
         }
+
+
+        [HttpPost("/AddNotifications")]
+        public IActionResult AddNotifications(AddNotificationViewModel model)
+
+        {
+
+            var path = "";
+            Services.Documents documentsService = new Services.Documents();
+            string filePath = @"wwwroot\Documents";
+
+            if (!string.IsNullOrEmpty(documentsService.UploadFile(model.Document, filePath)))
+            {
+                path = documentsService.UploadFile(model.Document, filePath);
+            }
+            else
+            {
+                path = null;
+            }
+
+
+
+
+            var Username = "ALL";
+
+
+            var SHOW = "";
+            if (string.IsNullOrEmpty(model.ShowTo))
+            {
+                SHOW = "0";
+            }
+            else {
+                SHOW = model.ShowTo;
+
+
+                Username = db.users.Where(x => x.Id == int.Parse(model.ShowTo)).Select(x => x.Username).FirstOrDefault();
+
+            }
+            var newNotif = new Notifications
+            {
+                Title = model.Title,
+                Description = model.Description,
+                DateOfNotification = DateTime.Now,
+                Status = 0,
+                showTo = SHOW,
+                Type = model.Type,
+                Username = Username,
+                DocumentPath = path
+            };
+
+            db.notifications.Add(newNotif);
+            db.SaveChanges();
+
+
+            return Ok(new { Status = true, newNotif });
+
+        }
+
+        [HttpGet("/GetNotificationsAdmin")]
+        public IActionResult GetNotificationsAdmin()
+        {
+            var AllNotifs = db.notifications.OrderByDescending(x => x.Id).ToList();
+
+            return Ok(new { Status = true, AllNotifs });
+
+
+        }
+
+
+        [HttpGet("/GetWalletLogOfUser")]
+        public IActionResult GetWalletLogOfUser(int userid)
+        {
+            var AllLogs = db.walletLogs.OrderByDescending(x => x.Id).Where(x => x.UserId == userid).ToList();
+
+            return Ok(new { Status = true, AllLogs });
+
+
+        }
+
+
+        [HttpGet("/GetFactorsOfUser")]
+        public IActionResult GetFactorsOfUser(int userid)
+        {
+            var AllLogs = db.factors.OrderByDescending(x => x.Id).Where(x => x.UserId == userid).ToList();
+
+            return Ok(new { Status = true, AllLogs });
+
+
+        }
+
+        [HttpGet("/GetStarLogsOfUser")]
+        public IActionResult GetStarLogsOfUser(int userid)
+        {
+            var AllLogs = db.userStarsLogs.OrderByDescending(x => x.Id).Where(x => x.UserId == userid).ToList();
+
+            return Ok(new { Status = true, AllLogs });
+
+
+        }
+
+        [HttpGet("/GetTicketsOfUser")]
+        public IActionResult GetTicketsOfUser(int userid)
+        {
+            var AllLogs = db.tickets.OrderByDescending(x => x.Id).Where(x => x.UserId == userid).ToList();
+
+            return Ok(new { Status = true, AllLogs });
+
+
+        }
+        [HttpGet("/GetAllRoles")]
+        public IActionResult GetAllRoles()
+        {
+            var AllRoles = db.roles.OrderByDescending(x => x.Id).ToList();
+
+            return Ok(new { Status = true, AllRoles });
+
+
+        }
+
+        [HttpGet("/GetAllSaths")]
+        public IActionResult GetAllSaths()
+        {
+            // ایجاد لیست مقادیر "کم"، "متوسط" و "زیاد"
+            var saths = new List<string> { "کم", "متوسط", "زیاد" };
+
+            return Ok(new { Status = true, Saths = saths });
+        }
+        [HttpPost("/AddRole")]
+        public IActionResult AddRole(string rolename, string sath)
+        {
+            var role = new Roles
+            {
+                RoleName = rolename,
+                sath = sath
+            };
+
+            db.roles.Add(role);
+            db.SaveChanges();
+
+            return Ok(new { Status = true, role });
+
+        }
+        [HttpPost("/ChangeRole")]
+        public IActionResult ChangeRole(string phone, int roleid)
+        {
+            var user = db.users.FirstOrDefault(x => x.Phone == phone);
+            if (user == null)
+            {
+                return BadRequest(new { Status = false, message = "user not found" });
+            }
+            else
+            {
+                var role = db.roles.FirstOrDefault(x => x.Id == roleid);
+
+                var token = GenerateJwtToken(user);
+
+
+                user.Role = role.RoleName;
+
+
+                db.SaveChanges();
+
+                return Ok(new { Status = true, user,token });
+
+            }
+
+        }
+
+        private string GenerateJwtToken(Users user)
+        {
+            var claims = new[]
+            {
+
+        new Claim("Email", user.Email?? string.Empty),
+        new Claim("PhoneNumber", user.Phone ?? string.Empty),
+         new Claim("Username", user.Username ?? string.Empty),
+         new Claim("Role", user.Role ?? string.Empty),
+        new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()), // اضافه کردن شناسه کاربر
+        new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+    };
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+            var token = new JwtSecurityToken(
+                issuer: _configuration["Jwt:Issuer"],
+                audience: _configuration["Jwt:Issuer"],
+                claims: claims,
+                expires: DateTime.Now.AddDays(2),
+                signingCredentials: creds);
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
+
+        [HttpGet("/SearchNotifs")]
+        public IActionResult SearchNotifs([FromQuery] string? onvan)
+        {
+            // Start with the base query
+            var query = db.notifications.AsQueryable();
+
+            // Apply title filter if onvan is provided
+            if (!string.IsNullOrEmpty(onvan))
+            {
+                query = query.Where(x => x.Title .Contains( onvan));
+            }
+
+            // Execute the query and get the results
+            var notifs = query.ToList();
+
+            // Return the results
+            return Ok(new { notifs, Status = true });
+        }
+
+        [HttpGet("/SearchContactUs")]
+        public IActionResult SearchContactUs([FromQuery] string? onvan)
+        {
+            // Start with the base query
+            var query = db.contact_Us.AsQueryable();
+
+            // Apply text filter if onvan is provided
+            if (!string.IsNullOrEmpty(onvan))
+            {
+                query = query.Where(x => x.Text .Contains( onvan));
+            }
+
+            // Execute the query and get the results
+            var contactus = query.ToList();
+
+            // Return the results
+            return Ok(new { contactus, Status = true });
+        }
+
+
+
+    
+
+    //    [HttpGet("SearchFactors")]
+    //    public async Task<IActionResult> SearchFactors(
+    //[FromQuery] DateTime? startDate = null,
+    //[FromQuery] DateTime? endDate = null,
+    //[FromQuery] string? name = null)
+    //    {
+    //        // Validate date range if both startDate and endDate are provided
+    //        if (startDate.HasValue && endDate.HasValue && startDate > endDate)
+    //        {
+    //            return BadRequest("Start date cannot be greater than end date.");
+    //        }
+
+    //        // Base query
+    //        var query = db.factors
+    //            .Include(f => f.User) // Include related User data
+    //            .Include(f => f.GiftCard) // Include related GiftCard data
+    //            .AsQueryable();
+
+    //        // Apply date filter if startDate and endDate are provided
+    //        if (startDate.HasValue && endDate.HasValue)
+    //        {
+    //            query = query.Where(f => f.FactorDate >= startDate && f.FactorDate <= endDate);
+    //        }
+
+    //        // Apply name filter if name is provided
+    //        if (!string.IsNullOrEmpty(name))
+    //        {
+    //            query = query.Where(f => f.UserName.Contains(name));
+    //        }
+
+    //        // Project the results
+    //        var factors = await query
+    //            .Select(f => new
+    //            {
+    //                // Fields from the Factors table
+    //                FactorId = f.Id,
+    //                UserId = f.UserId,
+    //                FactorDate = f.FactorDate,
+    //                GiftId = f.GiftId,
+    //                Status = f.Status,
+    //                Type = f.Type,
+    //                TransActionNumber = f.TransActionNumber,
+    //                FactorPrice = f.GiftCard.Price,
+    //                // Combine FirstName and LastName from the User navigation property
+    //                Username = f.User != null ? $"{f.User.FirstName} {f.User.LastName}" : "Unknown User",
+    //                // Price from the GiftCards table (handle null GiftCard)
+    //                GiftCardPrice = f.GiftCard != null ? f.GiftCard.Price : (double?)null
+    //            })
+    //            .ToListAsync();
+
+    //        // Check if any factors match the criteria
+    //        if (factors == null || !factors.Any())
+    //        {
+    //            return Ok(new { Message = "No factors found matching the specified criteria.", Status = true });
+    //        }
+
+    //        return Ok(new { factors, Status = true });
+    //    }
+
+
+        [HttpGet("/SearchFactorsByNameAndDate")]
+        public IActionResult SearchFactorsByNameAndDate(
+       [FromQuery] string? name, // Optional: Filter by user name
+       [FromQuery] DateTime? startDate , // Optional: Filter by start date
+       [FromQuery] DateTime? endDate ) // Optional: Filter by end date
+        {
+            // Validate date range if both startDate and endDate are provided
+            if (startDate.HasValue && endDate.HasValue && startDate > endDate)
+            {
+                return BadRequest(new
+                {
+                    Status = false,
+                    Message = "Start date cannot be greater than end date."
+                });
+            }
+
+            // Start with the base query
+            var query = db.factors
+                .Include(f => f.User) // Include related User data
+                .Include(f => f.GiftCard) // Include related GiftCard data
+                .AsQueryable();
+
+            // Apply name filter if name is provided
+            if (!string.IsNullOrEmpty(name))
+            {
+                query = query.Where(f => f.UserName.Contains(name)); // Assuming 'UserName' is the field for the user's name
+            }
+
+        
+            if (startDate.HasValue && endDate.HasValue)
+            {
+                query = query.Where(f => f.FactorDate >= startDate && f.FactorDate <= endDate); // Assuming 'FactorDate' is the field for the factor date
+            }
+
+            // Select the required fields and execute the query
+            var factors = query
+                .OrderByDescending(f => f.Id) // Order by Id in descending order
+                .Select(f => new
+                {
+                    // Fields from the Factors table
+                    FactorId = f.Id,
+                    UserId = f.UserId,
+                    FactorDate = f.FactorDate,
+                    GiftId = f.GiftId,
+                    Status = f.Status,
+                    Type = f.Type,
+                    TransActionNumber = f.TransActionNumber,
+                    FactorPrice = f.GiftCard.Price,
+                    // Combine FirstName and LastName from the User navigation property
+                    Username = f.User != null ? $"{f.User.Username} " : "Unknown User",
+                    // Price from the GiftCards table (handle null GiftCard)
+                    GiftCardPrice = f.GiftCard != null ? f.GiftCard.Price : (double?)null
+                })
+                .ToList();
+
+            // Check if any factors match the criteria
+            if (factors == null || !factors.Any())
+            {
+                return Ok(new
+                {
+                    Status = true,
+                    Message = "No factors found matching the specified criteria.",
+                    factors = new List<object>() // Return an empty list
+                });
+            }
+
+            // Return the filtered factors
+            return Ok(new { Status = true, factors });
+        }
+        [HttpPost("/DeleteContactUs")]
+        public IActionResult DeleteContactUs(int id)
+        {
+            var contactUs = db.contact_Us.FirstOrDefault(x=>x.Id==id);
+            if (contactUs == null)
+            {
+                return NotFound();
+            }
+
+            db.contact_Us.Remove(contactUs);
+             db.SaveChanges();
+
+            return Ok(new { Status = true, message = " درخاست  با موفقیت حذف شد" });
+
+        }
+        [HttpPost("DeleteAllContactUs")]
+        public IActionResult DeleteAllContactUs()
+        {
+            var all = db.contact_Us.ToList();
+            if (all.Any())
+            {
+                db.contact_Us.ExecuteDelete();
+                return Ok(new { Status = true, message = "تمام درخاست ها با موفقیت حذف شد" });
+
+            }
+            else
+            {
+                return BadRequest(new { Status = false, message = "درخاستی موجود نمیباشد" });
+
+            }
+           
+        }
+
 
     }
 }

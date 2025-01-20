@@ -14,6 +14,7 @@ namespace GiftStore.Models
 
         public string Country { get; set; }
         public DateTime ExpDate { get; set; }
+        public DateTime AddDate { get; set; }
 
         public double Price { get; set; }
  

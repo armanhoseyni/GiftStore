@@ -73,6 +73,7 @@ using Zarinpal.AspNetCore.Interfaces;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Json;
 using GiftStore.Services.Payment;
+using GiftStore.Jobs;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -105,7 +106,8 @@ builder.Services.AddHttpClient<SMSirService>();
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
-
+//builder.Services.AddHostedService<OtpCleanupService>();
+builder.Services.AddHostedService<BackGroundJob>();
 #region swagger 
 builder.Services.AddSwaggerGen(options =>
 {

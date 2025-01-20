@@ -11,7 +11,7 @@ namespace GiftStore.Models
         public string? Username{ get; set; }
 
         public string? LastName { get; set; }
-        public string Email{ get; set; }
+        public string? Email{ get; set; }
 
         public string Phone { get; set; }
         public string? Password { get; set; }
@@ -20,7 +20,7 @@ namespace GiftStore.Models
         
         public bool Active { get; set; }
 
-        public string  RegisterDate{ get; set; }
+        public DateTime  RegisterDate{ get; set; }
         public string?  Role{ get; set; }
 
         public double? wallet {  get; set; }

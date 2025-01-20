@@ -11,6 +11,7 @@ namespace GiftStore.Models
         public int UserId { get; set; }
         public int Star { get; set; }
         public string Type { get; set; } //income or out
+        public string? Username { get; set; } 
 
         public DateTime LogDate{get; set;}
 

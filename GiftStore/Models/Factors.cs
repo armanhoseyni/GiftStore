@@ -27,7 +27,7 @@ namespace GiftStore.Models
         public GiftCards GiftCard { get; set; }
       
 
-        public bool Status { get; set; }
+        public string Status { get; set; }
         public string Type { get; set; }
         public string TransActionNumber { get; set; }
     }
